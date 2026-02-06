@@ -76,22 +76,6 @@ cmake --build build -j
 
 因此建议在“仓库根目录”运行程序；或者显式传入 `--ptx/--ptx-isa/--inst-desc/--config` 的完整路径。
 
-### PTX op → IR op 的映射（两层配置）
-
-本项目运行时对“指令解析/执行语义”的配置是两层：
-
-- `--ptx-isa`（PTX ISA map）：决定 **PTX 指令形态**（`ptx_opcode + type_mod + operand_kinds`）映射到哪个 **IR opcode**（`ir_op`）。
-- `--inst-desc`（inst_desc，IR 语义库）：决定 **IR opcode**（以及其 operand_kinds/type_mod 形态）展开成哪些 **uops** 并执行。
-
-也就是说：PTX 输入并不会直接用 inst_desc 来“猜测/解析”操作数形态；PTX 的 form 选择完全由 `--ptx-isa` 驱动。
-
-调试映射时常见的错误码（来自 mapper 阶段）：
-
-- `OPERAND_FORM_MISMATCH`：给定的 `ptx_opcode/type_mod/operand_count` 有候选，但操作数 token 不符合任何候选的 `operand_kinds`。
-- `DESC_AMBIGUOUS`：同一条 PTX 指令被 **多条** PTX ISA entry 成功匹配。message 会列出所有匹配到的候选签名（`(operand_kinds) -> ir_op.type_mod`），用于回退/收敛规则。
-
-当你新增 PTX 指令或遇到 form 不匹配/歧义时，优先修改 `assets/ptx_isa/*.json`；同时确保 `assets/inst_desc/*.json` 中存在对应 `ir_op` 的语义条目，否则后续语义 lookup 会失败。
-
 ### 运行示例
 
 （从仓库根目录）

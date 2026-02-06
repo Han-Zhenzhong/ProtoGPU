@@ -4,8 +4,31 @@
 
 ## 前置条件
 
-- 需要你已经完成 CMake configure + build（产物在 build/ 或你自定义的 build 目录）
 - 建议从“仓库根目录”执行脚本（使用相对路径资源）
+
+说明：目前 `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
+
+## 构建（可选手动执行）
+
+用途：执行 CMake configure + build。
+
+Windows（cmd）
+
+```bat
+scripts\build.bat build Release
+```
+
+Bash（Git Bash / WSL / Linux / macOS）
+
+```bash
+bash scripts/build.sh build Release
+```
+
+常用环境变量
+
+- `CONFIG=Debug|Release`：选择 multi-config 的配置（Visual Studio / Xcode）；Ninja 单配置时也会作为 `CMAKE_BUILD_TYPE` 使用
+- `BUILD_TESTING=ON|OFF`：是否构建测试目标（默认 ON）
+- `GENERATOR`：强制指定 CMake generator（例如 `Ninja`），不设置则优先自动使用 Ninja（如果系统有）
 
 ## 单元测试
 
