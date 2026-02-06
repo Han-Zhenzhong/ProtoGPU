@@ -23,6 +23,7 @@ add_library(gpusim_core
   src/runtime/deps.cpp
   src/runtime/engines.cpp
   src/runtime/runtime.cpp
+  src/runtime/workload.cpp
 )
 
 target_include_directories(gpusim_core PUBLIC
@@ -52,4 +53,24 @@ if (BUILD_TESTING)
   )
   target_link_libraries(gpu-sim-builtins-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-builtins-tests COMMAND gpu-sim-builtins-tests)
+
+  add_test(
+    NAME gpu-sim-workload-smoke-single-stream
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}
+            $<TARGET_FILE:gpu-sim-cli>
+            --config assets/configs/demo_config.json
+            --workload assets/workloads/smoke_single_stream.json
+            --trace out/workload_smoke_single_stream.trace.jsonl
+            --stats out/workload_smoke_single_stream.stats.json
+  )
+
+  add_test(
+    NAME gpu-sim-workload-smoke-two-stream-event
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}
+            $<TARGET_FILE:gpu-sim-cli>
+            --config assets/configs/demo_config.json
+            --workload assets/workloads/smoke_two_stream_event.json
+            --trace out/workload_smoke_two_stream_event.trace.jsonl
+            --stats out/workload_smoke_two_stream_event.stats.json
+  )
 endif()

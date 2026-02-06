@@ -1,0 +1,39 @@
+{
+  "buffers": {
+    "host": {
+      "hin": { "bytes": 4, "init": { "zeros": {} } },
+      "hout": { "bytes": 4, "init": { "zeros": {} } }
+    },
+    "device": {
+      "out": { "bytes": 4, "align": 4 }
+    }
+  },
+  "modules": {
+    "demo": {
+      "ptx": "assets/ptx/demo_kernel.ptx",
+      "ptx_isa": "assets/ptx_isa/demo_ptx8.json",
+      "inst_desc": "assets/inst_desc/demo_desc.json"
+    }
+  },
+  "streams": {
+    "s0": {
+      "commands": [
+        { "copy": { "kind": "H2D", "dst": "out", "src": "hin", "bytes": 4 } },
+        {
+          "kernel": {
+            "module": "demo",
+            "entry": "demo_kernel",
+            "grid_dim": { "x": 1, "y": 1, "z": 1 },
+            "block_dim": { "x": 32, "y": 1, "z": 1 },
+            "args": {
+              "out_ptr": { "ptr_device": "out" },
+              "n": { "u32": 0 }
+            }
+          }
+        },
+        { "copy": { "kind": "D2H", "dst": "hout", "src": "out", "bytes": 4 } },
+        { "sync": {} }
+      ]
+    }
+  }
+}

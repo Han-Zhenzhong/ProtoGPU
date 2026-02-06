@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gpu-sim workload spec",
+  "type": "object",
+  "required": ["buffers", "modules", "streams"],
+  "properties": {
+    "buffers": {
+      "type": "object",
+      "required": ["host", "device"],
+      "properties": {
+        "host": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["bytes"],
+            "properties": {
+              "bytes": { "type": "integer", "minimum": 0 },
+              "init": {
+                "oneOf": [
+                  { "type": "string", "enum": ["zeros"] },
+                  {
+                    "type": "object",
+                    "minProperties": 1,
+                    "maxProperties": 1,
+                    "properties": {
+                      "zeros": {},
+                      "hex": { "type": "string" },
+                      "file": { "type": "string" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "device": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["bytes"],
+            "properties": {
+              "bytes": { "type": "integer", "minimum": 0 },
+              "align": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["ptx", "ptx_isa", "inst_desc"],
+        "properties": {
+          "ptx": { "type": "string" },
+          "ptx_isa": { "type": "string" },
+          "inst_desc": { "type": "string" }
+        }
+      }
+    },
+    "streams": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["commands"],
+        "properties": {
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "copy": {
+                  "type": "object",
+                  "required": ["kind", "dst", "src", "bytes"],
+                  "properties": {
+                    "kind": { "type": "string", "enum": ["H2D", "D2H", "D2D", "MEMSET"] },
+                    "dst": { "oneOf": [ {"type": "string"}, {"type": "object"} ] },
+                    "src": { "oneOf": [ {"type": "string"}, {"type": "object"} ] },
+                    "bytes": { "type": "integer", "minimum": 0 }
+                  }
+                },
+                "kernel": {
+                  "type": "object",
+                  "required": ["module", "entry", "grid_dim", "block_dim", "args"],
+                  "properties": {
+                    "module": { "type": "string" },
+                    "entry": { "type": "string" },
+                    "grid_dim": { "oneOf": [ {"type": "object"}, {"type": "array", "minItems": 3, "maxItems": 3} ] },
+                    "block_dim": { "oneOf": [ {"type": "object"}, {"type": "array", "minItems": 3, "maxItems": 3} ] },
+                    "args": { "type": "object" }
+                  }
+                },
+                "event_record": {
+                  "type": "object",
+                  "required": ["event"],
+                  "properties": { "event": { "type": "string" } }
+                },
+                "event_wait": {
+                  "type": "object",
+                  "required": ["event"],
+                  "properties": { "event": { "type": "string" } }
+                },
+                "sync": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

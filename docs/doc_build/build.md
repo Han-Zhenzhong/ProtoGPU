@@ -127,6 +127,44 @@ CLI 参数
 
 ---
 
+## WorkloadSpec（streams/commands：--workload）
+
+`gpu-sim-cli` 支持一个“可重放的 workload 输入文件”（WorkloadSpec JSON），用来描述：
+- buffers（host/device）
+- modules（ptx + ptx_isa + inst_desc 绑定）
+- streams（每 stream FIFO commands）
+- event_record / event_wait（跨 stream 依赖）
+
+该模式与抽象/实现设计对齐：
+- `doc_design/modules/07_runtime_streaming.md`
+- `doc_design/modules/07.01_stream_input_workload_spec.md`
+- `doc_dev/modules/07_runtime_streaming.md`
+- `doc_dev/modules/07.01_stream_input_workload_spec.md`
+
+### Demo workloads
+
+仓库内提供两个最小 smoke workload：
+- `assets/workloads/smoke_single_stream.json`
+- `assets/workloads/smoke_two_stream_event.json`
+
+### 运行示例
+
+（从仓库根目录）
+
+```bash
+./build/gpu-sim-cli \
+  --config assets/configs/demo_config.json \
+  --workload assets/workloads/smoke_single_stream.json \
+  --trace out/workload.trace.jsonl \
+  --stats out/workload.stats.json
+```
+
+说明
+- `--workload` 模式与单-kernel参数（`--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`）互斥。
+- trace 里会新增 `STREAM` 类别事件（例如 `cmd_enq/cmd_ready/cmd_submit/cmd_complete`），并携带 `cmd_id/stream_id`（event 相关命令额外携带 `event_id`）。
+
+---
+
 ## Kernel I/O + ABI（数据输入/参数输入/结果输出）演示
 
 仓库新增了一个最小端到端演示路径，用来验证：
@@ -199,3 +237,7 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release -V
 ```
+
+Workload smoke tests（若启用 BUILD_TESTING）
+- `gpu-sim-workload-smoke-single-stream`
+- `gpu-sim-workload-smoke-two-stream-event`

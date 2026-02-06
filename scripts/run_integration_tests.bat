@@ -64,6 +64,24 @@ if errorlevel 1 (
   exit /b %errorlevel%
 )
 
+echo [integration] 3D launch smoke: --grid 2,2,1 --block 40,1,1
+"%CLI%" --ptx "%PTX%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%CONFIG_JSON%" --grid 2,2,1 --block 40,1,1 --trace "%OUT_DIR%\trace_3d.jsonl" --stats "%OUT_DIR%\stats_3d.json" 1>"%OUT_DIR%\stdout_3d.txt" 2>"%OUT_DIR%\stderr_3d.txt"
+if errorlevel 1 (
+  echo error: 3D launch run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\stdout_3d.txt) ---
+  type "%OUT_DIR%\stdout_3d.txt"
+  echo --- stderr (%OUT_DIR%\stderr_3d.txt) ---
+  type "%OUT_DIR%\stderr_3d.txt"
+  exit /b %errorlevel%
+)
+
+for %%F in ("%OUT_DIR%\trace_3d.jsonl" "%OUT_DIR%\stats_3d.json") do (
+  if not exist %%~F (
+    echo error: missing output file: %%~F
+    exit /b 1
+  )
+)
+
 findstr /c:"io-demo u32 result: 42" "%OUT_DIR%\io_stdout.txt" >nul
 if errorlevel 1 (
   echo error: expected output not found in io_stdout.txt
@@ -71,6 +89,66 @@ if errorlevel 1 (
   type "%OUT_DIR%\io_stdout.txt"
   echo --- stderr (%OUT_DIR%\io_stderr.txt) ---
   type "%OUT_DIR%\io_stderr.txt"
+  exit /b 1
+)
+
+echo [integration] workload smoke: single stream
+"%CLI%" --config "%CONFIG_JSON%" --workload assets\workloads\smoke_single_stream.json --trace "%OUT_DIR%\workload_single.trace.jsonl" --stats "%OUT_DIR%\workload_single.stats.json" 1>"%OUT_DIR%\workload_single.stdout.txt" 2>"%OUT_DIR%\workload_single.stderr.txt"
+if errorlevel 1 (
+  echo error: workload single-stream run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\workload_single.stdout.txt) ---
+  type "%OUT_DIR%\workload_single.stdout.txt"
+  echo --- stderr (%OUT_DIR%\workload_single.stderr.txt) ---
+  type "%OUT_DIR%\workload_single.stderr.txt"
+  exit /b %errorlevel%
+)
+
+for %%F in ("%OUT_DIR%\workload_single.trace.jsonl" "%OUT_DIR%\workload_single.stats.json") do (
+  if not exist %%~F (
+    echo error: missing output file: %%~F
+    exit /b 1
+  )
+)
+
+findstr /c:"\"cat\":\"STREAM\"" "%OUT_DIR%\workload_single.trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected STREAM events in workload trace
+  exit /b 1
+)
+
+findstr /c:"\"action\":\"cmd_enq\"" "%OUT_DIR%\workload_single.trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected cmd_enq in workload trace
+  exit /b 1
+)
+
+echo [integration] workload smoke: two streams event_record/wait
+"%CLI%" --config "%CONFIG_JSON%" --workload assets\workloads\smoke_two_stream_event.json --trace "%OUT_DIR%\workload_event.trace.jsonl" --stats "%OUT_DIR%\workload_event.stats.json" 1>"%OUT_DIR%\workload_event.stdout.txt" 2>"%OUT_DIR%\workload_event.stderr.txt"
+if errorlevel 1 (
+  echo error: workload two-stream-event run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\workload_event.stdout.txt) ---
+  type "%OUT_DIR%\workload_event.stdout.txt"
+  echo --- stderr (%OUT_DIR%\workload_event.stderr.txt) ---
+  type "%OUT_DIR%\workload_event.stderr.txt"
+  exit /b %errorlevel%
+)
+
+for %%F in ("%OUT_DIR%\workload_event.trace.jsonl" "%OUT_DIR%\workload_event.stats.json") do (
+  if not exist %%~F (
+    echo error: missing output file: %%~F
+    exit /b 1
+  )
+)
+
+findstr /c:"\"action\":\"event_record\"" "%OUT_DIR%\workload_event.trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected event_record in workload trace
+  exit /b 1
+)
+
+findstr /c:"\"action\":\"event_wait_done\"" "%OUT_DIR%\workload_event.trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected event_wait_done in workload trace
   exit /b 1
 )
 

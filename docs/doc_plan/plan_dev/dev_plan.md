@@ -240,6 +240,9 @@
 - Schedulers：CTA/Warp。
 - Executor：fetch/lookup/expand/dispatch/commit。
 
+联动子计划（Kernel Launch 3D + builtins）
+- [doc_plan/plan_dev/plan-launchGridBlock3d.prompt.md](plan-launchGridBlock3d.prompt.md)
+
 验收点
 - 单 warp 可在 step_warp 循环中执行到结束。
 
@@ -251,6 +254,9 @@
 - Runtime host API：命令入队。
 - StreamManager/Queue：FIFO。
 - DependencyTracker：event_state + ready 判定 + completion。
+
+联动子计划（WorkloadSpec：stream 输入）
+- [doc_plan/plan_dev/plan-workload_spec_stream_input.md](plan-workload_spec_stream_input.md)
 
 验收点
 - event record/wait 依赖可复盘。

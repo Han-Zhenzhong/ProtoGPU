@@ -3,6 +3,7 @@
 参照
 - 抽象设计：`doc_design/modules/07_runtime_streaming.md`
 - Contracts：`doc_dev/modules/00_contracts.md`
+- WorkloadSpec（stream 输入）：`doc_dev/modules/07.01_stream_input_workload_spec.md`
 
 落地目标
 - stream FIFO 严格；event record/wait 的依赖判定可复盘。

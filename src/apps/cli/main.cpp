@@ -21,6 +21,8 @@ struct Args final {
   std::string stats_out = "out/stats.json";
   bool io_demo = false;
 
+  std::optional<std::string> workload;
+
   std::optional<gpusim::Dim3> grid;
   std::optional<gpusim::Dim3> block;
 };
@@ -37,24 +39,59 @@ gpusim::Dim3 parse_dim3_csv(const std::string& s) {
 
 Args parse_args(int argc, char** argv) {
   Args a;
+  bool used_single_kernel_mode_flag = false;
+
+  auto check_mode_compat = [&](const std::string& flag, bool is_workload_flag) {
+    if (is_workload_flag) {
+      if (used_single_kernel_mode_flag) {
+        throw std::runtime_error("--workload cannot be combined with single-kernel flags");
+      }
+    } else {
+      if (a.workload) {
+        throw std::runtime_error(flag + " cannot be combined with --workload");
+      }
+      used_single_kernel_mode_flag = true;
+    }
+  };
+
   for (int i = 1; i < argc; i++) {
     std::string k = argv[i];
     auto need = [&](const char* flag) {
       if (i + 1 >= argc) throw std::runtime_error(std::string("missing value for ") + flag);
       return std::string(argv[++i]);
     };
-    if (k == "--ptx") a.ptx = need("--ptx");
-    else if (k == "--ptx-isa") a.ptx_isa = need("--ptx-isa");
-    else if (k == "--inst-desc") a.inst_desc = need("--inst-desc");
-    else if (k == "--desc") a.inst_desc = need("--desc");
+    if (k == "--workload") {
+      check_mode_compat("--workload", true);
+      a.workload = need("--workload");
+    } else if (k == "--ptx") {
+      check_mode_compat("--ptx", false);
+      a.ptx = need("--ptx");
+    } else if (k == "--ptx-isa") {
+      check_mode_compat("--ptx-isa", false);
+      a.ptx_isa = need("--ptx-isa");
+    } else if (k == "--inst-desc") {
+      check_mode_compat("--inst-desc", false);
+      a.inst_desc = need("--inst-desc");
+    } else if (k == "--desc") {
+      check_mode_compat("--desc", false);
+      a.inst_desc = need("--desc");
+    }
     else if (k == "--config") a.config = need("--config");
     else if (k == "--trace") a.trace_out = need("--trace");
     else if (k == "--stats") a.stats_out = need("--stats");
-    else if (k == "--io-demo") a.io_demo = true;
-    else if (k == "--grid") a.grid = parse_dim3_csv(need("--grid"));
-    else if (k == "--block") a.block = parse_dim3_csv(need("--block"));
+    else if (k == "--io-demo") {
+      check_mode_compat("--io-demo", false);
+      a.io_demo = true;
+    } else if (k == "--grid") {
+      check_mode_compat("--grid", false);
+      a.grid = parse_dim3_csv(need("--grid"));
+    } else if (k == "--block") {
+      check_mode_compat("--block", false);
+      a.block = parse_dim3_csv(need("--block"));
+    }
     else if (k == "--help" || k == "-h") {
-      std::cout << "gpu-sim-cli --ptx <file> --ptx-isa <file> --inst-desc <file> --config <file> --trace <file> --stats <file> [--grid x,y,z] [--block x,y,z] [--io-demo]\n";
+      std::cout << "gpu-sim-cli --config <file> --trace <file> --stats <file> [--workload <file>]\n"
+                   "  (single-kernel mode) --ptx <file> --ptx-isa <file> --inst-desc <file> [--grid x,y,z] [--block x,y,z] [--io-demo]\n";
       std::exit(0);
     }
   }
@@ -69,13 +106,15 @@ int main(int argc, char** argv) {
     auto cfg = gpusim::load_app_config_json_file(args.config);
     gpusim::Runtime rt(cfg);
 
-    gpusim::LaunchConfig launch;
-    launch.grid_dim = args.grid.value_or(gpusim::Dim3{ 1, 1, 1 });
-    launch.block_dim = args.block.value_or(gpusim::Dim3{ cfg.sim.warp_size, 1, 1 });
-    launch.warp_size = cfg.sim.warp_size;
-
     gpusim::RunOutputs outputs;
-    if (args.io_demo) {
+    if (args.workload) {
+      outputs = rt.run_workload(*args.workload);
+    } else if (args.io_demo) {
+      gpusim::LaunchConfig launch;
+      launch.grid_dim = args.grid.value_or(gpusim::Dim3{ 1, 1, 1 });
+      launch.block_dim = args.block.value_or(gpusim::Dim3{ cfg.sim.warp_size, 1, 1 });
+      launch.warp_size = cfg.sim.warp_size;
+
       // IO demo expects the kernel to have a single param: .param .u64 out_ptr
       // Example PTX: assets/ptx/write_out.ptx
       auto dev_out = rt.device_malloc(4, 4);
@@ -112,6 +151,10 @@ int main(int argc, char** argv) {
         std::cout << "io-demo u32 result: " << v << "\n";
       }
     } else {
+      gpusim::LaunchConfig launch;
+      launch.grid_dim = args.grid.value_or(gpusim::Dim3{ 1, 1, 1 });
+      launch.block_dim = args.block.value_or(gpusim::Dim3{ cfg.sim.warp_size, 1, 1 });
+      launch.warp_size = cfg.sim.warp_size;
       outputs = rt.run_ptx_kernel_launch(args.ptx, args.ptx_isa, args.inst_desc, launch);
     }
 

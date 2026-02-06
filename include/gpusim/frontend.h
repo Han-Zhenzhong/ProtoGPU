@@ -35,6 +35,9 @@ class Binder final {
 public:
   KernelImage bind_first_kernel(const ModuleImage& m);
   KernelTokens bind_first_kernel(const ModuleTokens& m);
+
+  KernelImage bind_kernel_by_name(const ModuleImage& m, const std::string& entry);
+  KernelTokens bind_kernel_by_name(const ModuleTokens& m, const std::string& entry);
 };
 
 } // namespace gpusim

@@ -44,6 +44,20 @@ public:
                                              const KernelArgs& args,
                                              const LaunchConfig& launch);
 
+  RunOutputs run_ptx_kernel_entry_launch(const std::string& ptx_path,
+                                        const std::string& ptx_isa_path,
+                                        const std::string& inst_desc_path,
+                                        const std::string& entry,
+                                        const LaunchConfig& launch);
+  RunOutputs run_ptx_kernel_with_args_entry_launch(const std::string& ptx_path,
+                                                   const std::string& ptx_isa_path,
+                                                   const std::string& inst_desc_path,
+                                                   const std::string& entry,
+                                                   const KernelArgs& args,
+                                                   const LaunchConfig& launch);
+
+  RunOutputs run_workload(const std::string& workload_json_path);
+
   HostBufId host_alloc(std::uint64_t bytes);
   void host_write(HostBufId id, std::uint64_t offset, const std::vector<std::uint8_t>& bytes);
   std::optional<std::vector<std::uint8_t>> host_read(HostBufId id, std::uint64_t offset, std::uint64_t bytes) const;

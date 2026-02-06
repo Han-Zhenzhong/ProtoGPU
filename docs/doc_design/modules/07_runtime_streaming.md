@@ -55,6 +55,12 @@ EventWaitPayload { event_id }
 统一放在独立设计文档中：
 - [doc_design/modules/09_kernel_io_and_abi.md](09_kernel_io_and_abi.md)
 
+此外，“用户如何输入 stream 命令序列（workload）”的建议形态见：
+- [doc_design/modules/07.01_stream_input_workload_spec.md](07.01_stream_input_workload_spec.md)
+
+Kernel launch 的 3D grid/block 与 builtins 规则见：
+- [doc_design/modules/06.01_launch_grid_block_3d.md](06.01_launch_grid_block_3d.md)
+
 ---
 
 ## 内部执行流程（Internal Flow）

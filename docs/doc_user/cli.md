@@ -4,6 +4,7 @@
 
 ## 参数
 
+- `--workload <file>`：运行 WorkloadSpec（streams/commands）JSON（与单-kernel模式互斥）
 - `--ptx <file>`：PTX 输入文件路径
 - `--ptx-isa <file>`：PTX ISA 映射表 JSON 路径（必需：PTX op 形态 → ir_op + operand_kinds）
 - `--inst-desc <file>`：指令描述 JSON（inst_desc，IR 语义库：ir_op → uops）
@@ -36,6 +37,62 @@
   --trace out/trace.jsonl \
   --stats out/stats.json
 ```
+
+## WorkloadSpec（--workload：streams/commands）
+
+用途
+- 用一个“可重放”的 JSON 文件描述：buffers/modules/streams/commands。
+- 支持多 stream FIFO 与 `event_record` / `event_wait` 的依赖判定；trace 可复盘 `cmd_enq/cmd_ready/cmd_submit/cmd_complete`。
+
+参照文档
+- 抽象设计：`doc_design/modules/07_runtime_streaming.md`、`doc_design/modules/07.01_stream_input_workload_spec.md`
+- 实现设计：`doc_dev/modules/07_runtime_streaming.md`、`doc_dev/modules/07.01_stream_input_workload_spec.md`
+
+运行示例
+
+```bash
+./build/gpu-sim-cli \
+  --config assets/configs/demo_config.json \
+  --workload assets/workloads/smoke_single_stream.json \
+  --trace out/workload.trace.jsonl \
+  --stats out/workload.stats.json
+```
+
+模式互斥
+- 提供 `--workload` 时，禁止组合单-kernel参数：`--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`。
+
+WorkloadSpec v0（当前实现能力）
+- buffers
+  - `buffers.host[name]`: `{ bytes, init? }`，init 支持：`zeros`、`{hex: "..."}`、`{file: "path"}`
+  - `buffers.device[name]`: `{ bytes, align? }`
+- modules
+  - `modules[name]`: `{ ptx, ptx_isa, inst_desc }`
+- streams
+  - `streams[name].commands[]`: oneof：`copy/kernel/event_record/event_wait/sync`
+
+支持的命令（v0 基线）
+- `copy.kind`：目前仅支持 `H2D` 与 `D2H`（`D2D/MEMSET` 会报 schema/限制错误）
+- `kernel`：必须包含 `module/entry/grid_dim/block_dim/args`
+  - `grid_dim/block_dim` 支持两种写法：`{x,y,z}` 或 `[x,y,z]`
+  - `args` oneof：`{u32: N}` / `{u64: N}` / `{ptr_device: "dev_buf_name"}` / `{bytes_hex: "..."}`
+- `event_record/event_wait`：`{ event: "NAME" }`（event name 会 deterministically 映射到 EventId）
+- `sync {}`：作为显式同步点（当前实现为同步 runtime 下的 barrier/no-op，但会出现在 trace 的 cmd 生命周期中）
+
+Workload schema 文件
+- `schemas/workload.schema.json` 作为“字段规范/契约”存在。
+- 当前实现采用“结构化校验 + 语义引用校验”的方式，不依赖通用 JSON Schema 引擎。
+
+错误处理（基线）
+- JSON 解析/结构不合法：`runtime:E_WORKLOAD_SCHEMA`
+- 引用不存在的 buffer/module/event：`runtime:E_WORKLOAD_REF`
+- kernel entry 不存在：`runtime:E_ENTRY_NOT_FOUND`
+- 参数缺失/类型不匹配：`runtime:E_BAD_ARGS`
+- launch 维度非法：`runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`
+- 所有 stream 的队首都不 ready（常见原因：等待一个从未 record 的 event）：`runtime:E_WORKLOAD_DEADLOCK`
+
+注意（当前实现限制）
+- runtime/streaming 的 “engines 分层 + async tick” 仍在演进；WorkloadSpec v0 目前以同步执行实现 FIFO 与 event 依赖语义。
+- `--workload` 运行 kernel 时，会按 `modules[name]` 指定的 `ptx/ptx_isa/inst_desc` 加载并执行；为保证可重放，请在 workload 里显式绑定这些路径。
 
 ## 3D Kernel Launch（grid/block）语义
 

@@ -1,0 +1,18 @@
+{
+  "buffers": { "host": {}, "device": {} },
+  "modules": {},
+  "streams": {
+    "s0": {
+      "commands": [
+        { "event_record": { "event": "E" } },
+        { "sync": {} }
+      ]
+    },
+    "s1": {
+      "commands": [
+        { "event_wait": { "event": "E" } },
+        { "sync": {} }
+      ]
+    }
+  }
+}

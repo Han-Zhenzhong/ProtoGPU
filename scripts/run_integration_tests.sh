@@ -86,6 +86,39 @@ if [[ ! -s "$OUT_DIR/stats.json" ]]; then
   exit 1
 fi
 
+echo "[integration] 3D launch smoke: --grid 2,2,1 --block 40,1,1"
+set +e
+"$CLI" \
+  --ptx "$PTX" \
+  --ptx-isa "$PTX_ISA" \
+  --inst-desc "$INST_DESC" \
+  --config "$CONFIG_JSON" \
+  --grid 2,2,1 \
+  --block 40,1,1 \
+  --trace "$OUT_DIR/trace_3d.jsonl" \
+  --stats "$OUT_DIR/stats_3d.json" \
+  >"$OUT_DIR/stdout_3d.txt" 2>"$OUT_DIR/stderr_3d.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: 3D launch run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/stdout_3d.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stdout_3d.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/stderr_3d.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stderr_3d.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/trace_3d.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/trace_3d.jsonl" >&2
+  exit 1
+fi
+if [[ ! -s "$OUT_DIR/stats_3d.json" ]]; then
+  echo "error: missing/empty stats: $OUT_DIR/stats_3d.json" >&2
+  exit 1
+fi
+
 echo "[integration] io-demo: write_out.ptx"
 set +e
 "$CLI" \
@@ -113,6 +146,74 @@ if ! grep -Fq "io-demo u32 result: 42" "$OUT_DIR/io_stdout.txt"; then
   echo "error: expected io-demo output not found" >&2
   echo "--- stdout ($OUT_DIR/io_stdout.txt) ---" >&2
   tail -n 200 "$OUT_DIR/io_stdout.txt" >&2 || true
+  exit 1
+fi
+
+echo "[integration] workload smoke: single stream (H2D -> KERNEL -> D2H -> sync)"
+set +e
+"$CLI" \
+  --config "$CONFIG_JSON" \
+  --workload "assets/workloads/smoke_single_stream.json" \
+  --trace "$OUT_DIR/workload_single.trace.jsonl" \
+  --stats "$OUT_DIR/workload_single.stats.json" \
+  >"$OUT_DIR/workload_single.stdout.txt" 2>"$OUT_DIR/workload_single.stderr.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: workload single-stream run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/workload_single.stdout.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/workload_single.stdout.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/workload_single.stderr.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/workload_single.stderr.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/workload_single.trace.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/workload_single.trace.jsonl" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"cat":"STREAM"' "$OUT_DIR/workload_single.trace.jsonl"; then
+  echo "error: expected STREAM events in workload trace" >&2
+  exit 1
+fi
+if ! grep -Fq '"action":"cmd_enq"' "$OUT_DIR/workload_single.trace.jsonl"; then
+  echo "error: expected cmd_enq in workload trace" >&2
+  exit 1
+fi
+
+echo "[integration] workload smoke: two streams (event_record/wait)"
+set +e
+"$CLI" \
+  --config "$CONFIG_JSON" \
+  --workload "assets/workloads/smoke_two_stream_event.json" \
+  --trace "$OUT_DIR/workload_event.trace.jsonl" \
+  --stats "$OUT_DIR/workload_event.stats.json" \
+  >"$OUT_DIR/workload_event.stdout.txt" 2>"$OUT_DIR/workload_event.stderr.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: workload two-stream-event run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/workload_event.stdout.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/workload_event.stdout.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/workload_event.stderr.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/workload_event.stderr.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/workload_event.trace.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/workload_event.trace.jsonl" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"action":"event_record"' "$OUT_DIR/workload_event.trace.jsonl"; then
+  echo "error: expected event_record in workload trace" >&2
+  exit 1
+fi
+if ! grep -Fq '"action":"event_wait_done"' "$OUT_DIR/workload_event.trace.jsonl"; then
+  echo "error: expected event_wait_done in workload trace" >&2
   exit 1
 fi
 
