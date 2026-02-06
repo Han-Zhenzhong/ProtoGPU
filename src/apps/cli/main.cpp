@@ -6,6 +6,8 @@
 #include <fstream>
 #include <cstdint>
 #include <iostream>
+#include <optional>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -18,7 +20,20 @@ struct Args final {
   std::string trace_out = "out/trace.jsonl";
   std::string stats_out = "out/stats.json";
   bool io_demo = false;
+
+  std::optional<gpusim::Dim3> grid;
+  std::optional<gpusim::Dim3> block;
 };
+
+gpusim::Dim3 parse_dim3_csv(const std::string& s) {
+  std::uint64_t x = 0, y = 0, z = 0;
+  char c1 = 0, c2 = 0;
+  std::istringstream iss(s);
+  if (!(iss >> x >> c1 >> y >> c2 >> z) || c1 != ',' || c2 != ',') {
+    throw std::runtime_error("invalid dim3, expected x,y,z: " + s);
+  }
+  return gpusim::Dim3{ static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y), static_cast<std::uint32_t>(z) };
+}
 
 Args parse_args(int argc, char** argv) {
   Args a;
@@ -36,8 +51,10 @@ Args parse_args(int argc, char** argv) {
     else if (k == "--trace") a.trace_out = need("--trace");
     else if (k == "--stats") a.stats_out = need("--stats");
     else if (k == "--io-demo") a.io_demo = true;
+    else if (k == "--grid") a.grid = parse_dim3_csv(need("--grid"));
+    else if (k == "--block") a.block = parse_dim3_csv(need("--block"));
     else if (k == "--help" || k == "-h") {
-      std::cout << "gpu-sim-cli --ptx <file> --ptx-isa <file> --inst-desc <file> --config <file> --trace <file> --stats <file> [--io-demo]\n";
+      std::cout << "gpu-sim-cli --ptx <file> --ptx-isa <file> --inst-desc <file> --config <file> --trace <file> --stats <file> [--grid x,y,z] [--block x,y,z] [--io-demo]\n";
       std::exit(0);
     }
   }
@@ -52,6 +69,11 @@ int main(int argc, char** argv) {
     auto cfg = gpusim::load_app_config_json_file(args.config);
     gpusim::Runtime rt(cfg);
 
+    gpusim::LaunchConfig launch;
+    launch.grid_dim = args.grid.value_or(gpusim::Dim3{ 1, 1, 1 });
+    launch.block_dim = args.block.value_or(gpusim::Dim3{ cfg.sim.warp_size, 1, 1 });
+    launch.warp_size = cfg.sim.warp_size;
+
     gpusim::RunOutputs outputs;
     if (args.io_demo) {
       // IO demo expects the kernel to have a single param: .param .u64 out_ptr
@@ -65,7 +87,7 @@ int main(int argc, char** argv) {
         ka.blob[static_cast<std::size_t>(b)] = static_cast<std::uint8_t>((dev_out >> (8 * b)) & 0xFFu);
       }
 
-      outputs = rt.run_ptx_kernel_with_args(args.ptx, args.ptx_isa, args.inst_desc, ka);
+      outputs = rt.run_ptx_kernel_with_args_launch(args.ptx, args.ptx_isa, args.inst_desc, ka, launch);
 
       if (outputs.sim.diag) {
         std::cerr << "Simulation error: " << outputs.sim.diag->module << ":" << outputs.sim.diag->code << " "
@@ -90,7 +112,7 @@ int main(int argc, char** argv) {
         std::cout << "io-demo u32 result: " << v << "\n";
       }
     } else {
-      outputs = rt.run_ptx_kernel(args.ptx, args.ptx_isa, args.inst_desc);
+      outputs = rt.run_ptx_kernel_launch(args.ptx, args.ptx_isa, args.inst_desc, launch);
     }
 
     std::filesystem::create_directories(std::filesystem::path(args.trace_out).parent_path());

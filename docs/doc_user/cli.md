@@ -12,6 +12,8 @@
 - `--trace <file>`：trace 输出路径（jsonl）
 - `--stats <file>`：stats 输出路径（json）
 - `--io-demo`：启用 Kernel I/O + ABI 的最小端到端演示（见下文）
+- `--grid x,y,z`：设置 3D gridDim（默认 `1,1,1`）
+- `--block x,y,z`：设置 3D blockDim（默认 `<warp_size>,1,1`；warp_size 来自 config 的 `sim.warp_size`）
 
 ## 默认输入
 
@@ -29,9 +31,42 @@
   --ptx-isa assets/ptx_isa/demo_ptx8.json \
   --inst-desc assets/inst_desc/demo_desc.json \
   --config assets/configs/demo_config.json \
+  --grid 1,1,1 \
+  --block 32,1,1 \
   --trace out/trace.jsonl \
   --stats out/stats.json
 ```
+
+## 3D Kernel Launch（grid/block）语义
+
+`--grid` 与 `--block` 控制一次 kernel launch 的执行域：
+
+- `grid_dim = (grid.x, grid.y, grid.z)`：CTA（block）数量
+- `block_dim = (block.x, block.y, block.z)`：每个 CTA 内线程数为 `block.x * block.y * block.z`
+
+SIMT 侧会对 CTA/warp/lane 做确定性枚举，并为部分 warp 设置 `active_mask`：
+- 当 `threads_per_block` 不是 `warp_size` 的整数倍时，最后一个 warp 只激活前 `threads_per_block % warp_size` 个 lanes。
+
+示例
+
+```bash
+# 2 个 CTA；每个 CTA 为 40 threads（会产生 2 个 warp，其中第 2 个 warp 只激活 8 lanes）
+./build/gpu-sim-cli --grid 2,1,1 --block 40,1,1
+```
+
+错误处理（基线）
+- 任一维度为 0：`runtime:E_LAUNCH_DIM`
+- `block.x * block.y * block.z` 乘法溢出：`runtime:E_LAUNCH_OVERFLOW`
+
+## builtin（例如 %tid.x / %ctaid.x）
+
+本项目将 builtin 作为一种操作数类型（`special`）来支持。当前基线支持：
+- `%tid.{x,y,z}`、`%ntid.{x,y,z}`、`%ctaid.{x,y,z}`、`%nctaid.{x,y,z}`
+- `%laneid`、`%warpid`
+
+注意
+- 是否能“执行到 builtin 读取”取决于你提供的 `--ptx-isa` / `--inst-desc` 是否包含对应 form（例如 `mov.u32 (reg, special)`）。
+- demo 资产已提供最小 form：`mov.u32 %r0, %tid.x;` 能映射并执行。
 
 ## PTX op → IR op 映射（`--ptx-isa`）
 

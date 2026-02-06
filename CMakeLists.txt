@@ -46,4 +46,10 @@ if (BUILD_TESTING)
   )
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
+
+  add_executable(gpu-sim-builtins-tests
+    tests/builtins_tests.cpp
+  )
+  target_link_libraries(gpu-sim-builtins-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-builtins-tests COMMAND gpu-sim-builtins-tests)
 endif()

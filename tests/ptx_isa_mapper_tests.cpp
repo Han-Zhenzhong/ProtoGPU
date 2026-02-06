@@ -59,6 +59,7 @@ int main() {
     {
       "insts": [
         { "ptx_opcode": "mov", "type_mod": "u32", "operand_kinds": ["reg", "imm"], "ir_op": "mov" },
+        { "ptx_opcode": "mov", "type_mod": "u32", "operand_kinds": ["reg", "special"], "ir_op": "mov" },
         { "ptx_opcode": "mov", "type_mod": "u32", "operand_kinds": ["reg", "symbol"], "ir_op": "mov" }
       ]
     }
@@ -78,6 +79,53 @@ int main() {
     EXPECT_EQ(ir.operands[0].reg_id, 0);
     EXPECT_EQ(ir.operands[1].kind, OperandKind::Imm);
     EXPECT_EQ(ir.operands[1].imm_i64, 0);
+  }
+
+  {
+    const std::string isa_json = R"JSON(
+    {
+      "insts": [
+        { "ptx_opcode": "mov", "type_mod": "u32", "operand_kinds": ["reg", "special"], "ir_op": "mov" }
+      ]
+    }
+    )JSON";
+
+    TokenizedPtxInst inst;
+    inst.ptx_opcode = "mov";
+    inst.mods.type_mod = "u32";
+    inst.operand_tokens = {"%r0", "%tid.x"};
+
+    InstRecord ir;
+    auto diag = map_one(isa_json, inst, ir);
+    EXPECT_TRUE(!diag.has_value());
+    EXPECT_EQ(ir.opcode, std::string("mov"));
+    EXPECT_EQ(ir.operands.size(), static_cast<std::size_t>(2));
+    EXPECT_EQ(ir.operands[1].kind, OperandKind::Special);
+    EXPECT_EQ(ir.operands[1].special, std::string("tid.x"));
+  }
+
+  {
+    const std::string isa_json = R"JSON(
+    {
+      "insts": [
+        { "ptx_opcode": "mov", "type_mod": "u32", "operand_kinds": ["reg", "special"], "ir_op": "mov" }
+      ]
+    }
+    )JSON";
+
+    TokenizedPtxInst inst;
+    inst.ptx_opcode = "mov";
+    inst.mods.type_mod = "u32";
+    inst.operand_tokens = {"%r0", "%tid.x"};
+
+    InstRecord ir;
+    auto diag = map_one(isa_json, inst, ir);
+    EXPECT_TRUE(!diag.has_value());
+    EXPECT_EQ(ir.opcode, std::string("mov"));
+    EXPECT_EQ(ir.operands.size(), static_cast<std::size_t>(2));
+    EXPECT_EQ(ir.operands[0].kind, OperandKind::Reg);
+    EXPECT_EQ(ir.operands[1].kind, OperandKind::Special);
+    EXPECT_EQ(ir.operands[1].special, std::string("tid.x"));
   }
 
   {

@@ -11,6 +11,14 @@
     {
       "opcode": "mov",
       "type_mod": "u32",
+      "operand_kinds": ["reg", "special"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mov",
+      "type_mod": "u32",
       "operand_kinds": ["reg", "reg"],
       "uops": [
         { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }

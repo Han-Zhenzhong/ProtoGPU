@@ -14,7 +14,10 @@
           "type_mod": { "type": "string" },
           "operand_kinds": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string",
+              "enum": ["reg", "pred", "imm", "addr", "symbol", "special"]
+            }
           },
           "ir_op": { "type": "string" }
         }

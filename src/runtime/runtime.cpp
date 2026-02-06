@@ -3,10 +3,37 @@
 #include "gpusim/json.h"
 
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
 namespace gpusim {
+
+static std::optional<Diagnostic> validate_launch(const LaunchConfig& launch, const std::string& kernel_name) {
+  if (launch.grid_dim.x == 0 || launch.grid_dim.y == 0 || launch.grid_dim.z == 0 ||
+      launch.block_dim.x == 0 || launch.block_dim.y == 0 || launch.block_dim.z == 0) {
+    return Diagnostic{ "runtime", "E_LAUNCH_DIM", "grid/block dims must be >= 1", std::nullopt, kernel_name, std::nullopt };
+  }
+
+  auto mul_overflow = [](std::uint64_t a, std::uint64_t b, std::uint64_t& out) -> bool {
+    if (a == 0 || b == 0) {
+      out = 0;
+      return false;
+    }
+    if (a > (std::numeric_limits<std::uint64_t>::max)() / b) return true;
+    out = a * b;
+    return false;
+  };
+
+  std::uint64_t xy = 0;
+  std::uint64_t threads_per_block = 0;
+  const bool of1 = mul_overflow(launch.block_dim.x, launch.block_dim.y, xy);
+  const bool of2 = mul_overflow(xy, launch.block_dim.z, threads_per_block);
+  if (of1 || of2 || threads_per_block == 0) {
+    return Diagnostic{ "runtime", "E_LAUNCH_OVERFLOW", "threads_per_block overflow", std::nullopt, kernel_name, std::nullopt };
+  }
+  return std::nullopt;
+}
 
 static std::string slurp(const std::string& path) {
   std::ifstream f(path, std::ios::binary);
@@ -94,6 +121,17 @@ void Runtime::memcpy_d2h(HostBufId dst, std::uint64_t dst_offset, DevicePtr src,
 }
 
 RunOutputs Runtime::run_ptx_kernel(const std::string& ptx_path, const std::string& ptx_isa_path, const std::string& inst_desc_path) {
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ cfg_.sim.warp_size, 1, 1 };
+  launch.warp_size = cfg_.sim.warp_size;
+  return run_ptx_kernel_launch(ptx_path, ptx_isa_path, inst_desc_path, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_launch(const std::string& ptx_path,
+                                         const std::string& ptx_isa_path,
+                                         const std::string& inst_desc_path,
+                                         const LaunchConfig& launch) {
   RunOutputs out;
 
   Parser parser;
@@ -118,11 +156,18 @@ RunOutputs Runtime::run_ptx_kernel(const std::string& ptx_path, const std::strin
     return out;
   }
 
+  if (auto d = validate_launch(launch, kernel.name)) {
+    out.sim.diag = *d;
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
   DescriptorRegistry reg;
   reg.load_json_file(inst_desc_path);
 
   SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel);
+  out.sim = exec.run(kernel, launch);
   return out;
 }
 
@@ -130,6 +175,18 @@ RunOutputs Runtime::run_ptx_kernel_with_args(const std::string& ptx_path,
                                             const std::string& ptx_isa_path,
                                             const std::string& inst_desc_path,
                                             const KernelArgs& args) {
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ cfg_.sim.warp_size, 1, 1 };
+  launch.warp_size = cfg_.sim.warp_size;
+  return run_ptx_kernel_with_args_launch(ptx_path, ptx_isa_path, inst_desc_path, args, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_with_args_launch(const std::string& ptx_path,
+                                                    const std::string& ptx_isa_path,
+                                                    const std::string& inst_desc_path,
+                                                    const KernelArgs& args,
+                                                    const LaunchConfig& launch) {
   RunOutputs out;
 
   Parser parser;
@@ -149,6 +206,13 @@ RunOutputs Runtime::run_ptx_kernel_with_args(const std::string& ptx_path,
 
   if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
     out.sim.diag = *diag;
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
+  if (auto d = validate_launch(launch, kernel.name)) {
+    out.sim.diag = *d;
     out.sim.completed = false;
     out.sim.steps = 0;
     return out;
@@ -161,7 +225,7 @@ RunOutputs Runtime::run_ptx_kernel_with_args(const std::string& ptx_path,
   reg.load_json_file(inst_desc_path);
 
   SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel);
+  out.sim = exec.run(kernel, launch);
   return out;
 }
 

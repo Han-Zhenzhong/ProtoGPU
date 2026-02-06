@@ -9,6 +9,12 @@
     {
       "ptx_opcode": "mov",
       "type_mod": "u32",
+      "operand_kinds": ["reg", "special"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u32",
       "operand_kinds": ["reg", "symbol"],
       "ir_op": "mov"
     },

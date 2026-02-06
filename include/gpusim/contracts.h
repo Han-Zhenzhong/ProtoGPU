@@ -43,12 +43,33 @@ struct LaneMask final {
   std::uint32_t bits_lo = 0xFFFF'FFFFu; // warp_size<=32 baseline
 };
 
+struct Dim3 final {
+  std::uint32_t x = 1;
+  std::uint32_t y = 1;
+  std::uint32_t z = 1;
+};
+
+struct LaunchConfig final {
+  Dim3 grid_dim;
+  Dim3 block_dim;
+  std::uint32_t warp_size = 32;
+};
+
+struct Builtins final {
+  Dim3 tid;
+  Dim3 ntid;
+  Dim3 ctaid;
+  Dim3 nctaid;
+  std::uint32_t laneid = 0;
+  std::uint32_t warpid = 0;
+};
+
 struct Value final {
   ValueType type = ValueType::U32;
   std::vector<std::uint64_t> lanes;
 };
 
-enum class OperandKind : std::uint8_t { Reg, Pred, Imm, Addr, Symbol };
+enum class OperandKind : std::uint8_t { Reg, Pred, Imm, Addr, Symbol, Special };
 
 struct Operand final {
   OperandKind kind = OperandKind::Imm;
@@ -57,6 +78,7 @@ struct Operand final {
   std::int64_t pred_id = -1;
   std::int64_t imm_i64 = 0;
   std::string symbol;
+  std::string special;
 };
 
 struct PredGuard final {

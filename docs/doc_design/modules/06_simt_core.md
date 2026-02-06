@@ -3,6 +3,7 @@
 说明
 - 本文只描述抽象逻辑：上下文模型、ready 判定、Executor 单步语义。
 - 设计基准：与 [doc_design/arch_modules_block.diagram.puml](../arch_modules_block.diagram.puml) 与 [doc_design/sequence.diagram.puml](../sequence.diagram.puml) 对齐；若文本与图冲突，以图为准。
+- Kernel Launch（3D grid/block + builtins）详见：[doc_design/modules/06.01_launch_grid_block_3d.md](06.01_launch_grid_block_3d.md)
 
 ---
 

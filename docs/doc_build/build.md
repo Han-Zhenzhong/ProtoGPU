@@ -103,6 +103,30 @@ cmake --build build -j
 
 ---
 
+## 3D Kernel Launch（grid/block）
+
+`gpu-sim-cli` 支持以 3D `grid_dim` / `block_dim` 形式启动 kernel（对齐 `doc_design/modules/06.01_launch_grid_block_3d.md` 的抽象语义）。
+
+CLI 参数
+- `--grid x,y,z`：gridDim（三维 CTA 数）
+- `--block x,y,z`：blockDim（三维 thread 维度）
+
+默认值
+- `--grid` 默认 `1,1,1`
+- `--block` 默认 `<warp_size>,1,1`（warp_size 来自 config 中 `sim.warp_size`）
+
+运行示例（从仓库根目录）
+
+```bash
+./build/gpu-sim-cli --ptx assets/ptx/demo_kernel.ptx --grid 2,1,1 --block 32,1,1
+```
+
+说明
+- 当前 demo PTX 是否“实际使用 builtin（例如 `%tid.x`）”取决于你传入的 PTX 文件与 ISA/inst_desc 资产；launch 维度会贯穿 SIMT 侧上下文（CTA/warp/lane）。
+- `block_dim.x * block_dim.y * block_dim.z` 不是 warp_size 的整数倍时，最后一个 warp 会是部分 warp（`active_mask` 会关闭无效 lanes）。
+
+---
+
 ## Kernel I/O + ABI（数据输入/参数输入/结果输出）演示
 
 仓库新增了一个最小端到端演示路径，用来验证：
@@ -153,3 +177,25 @@ build\Release\gpu-sim-cli.exe --ptx assets\ptx\write_out.ptx --io-demo
   - `add_executable(gpu-sim-cli src/apps/cli/main.cpp)`
   - `target_link_libraries(gpu-sim-cli PRIVATE gpusim_core)`
   - 编译标准：C++17，且禁用编译器扩展（`CMAKE_CXX_EXTENSIONS OFF`）
+
+---
+
+## 运行测试（CTest）
+
+本仓库使用 CTest 注册测试用例（见根目录 `CMakeLists.txt`）。
+
+Ninja/Makefiles（single-config）
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build -V
+```
+
+Visual Studio（multi-config）
+
+```bat
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+ctest --test-dir build -C Release -V
+```

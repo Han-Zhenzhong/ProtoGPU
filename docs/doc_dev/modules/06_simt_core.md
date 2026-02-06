@@ -3,6 +3,7 @@
 参照
 - 抽象设计：`doc_design/modules/06_simt_core.md`
 - Contracts：`doc_dev/modules/00_contracts.md`
+- Kernel Launch（3D grid/block + builtins）：`doc_dev/modules/06.01_launch_grid_block_3d.md`
 
 落地目标
 - Executor 的单步边界清晰，阻塞可重试。

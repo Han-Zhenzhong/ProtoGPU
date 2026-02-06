@@ -34,6 +34,16 @@ public:
   RunOutputs run_ptx_kernel(const std::string& ptx_path, const std::string& ptx_isa_path, const std::string& inst_desc_path);
   RunOutputs run_ptx_kernel_with_args(const std::string& ptx_path, const std::string& ptx_isa_path, const std::string& inst_desc_path, const KernelArgs& args);
 
+  RunOutputs run_ptx_kernel_launch(const std::string& ptx_path,
+                                  const std::string& ptx_isa_path,
+                                  const std::string& inst_desc_path,
+                                  const LaunchConfig& launch);
+  RunOutputs run_ptx_kernel_with_args_launch(const std::string& ptx_path,
+                                             const std::string& ptx_isa_path,
+                                             const std::string& inst_desc_path,
+                                             const KernelArgs& args,
+                                             const LaunchConfig& launch);
+
   HostBufId host_alloc(std::uint64_t bytes);
   void host_write(HostBufId id, std::uint64_t offset, const std::vector<std::uint8_t>& bytes);
   std::optional<std::vector<std::uint8_t>> host_read(HostBufId id, std::uint64_t offset, std::uint64_t bytes) const;

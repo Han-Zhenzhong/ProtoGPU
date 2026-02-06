@@ -30,6 +30,7 @@ std::string operand_kind_to_string(OperandKind k) {
   case OperandKind::Imm: return "imm";
   case OperandKind::Addr: return "addr";
   case OperandKind::Symbol: return "symbol";
+  case OperandKind::Special: return "special";
   }
   return "imm";
 }

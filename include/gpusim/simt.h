@@ -29,6 +29,7 @@ public:
   SimtExecutor(SimConfig cfg, DescriptorRegistry registry, ObsControl& obs, AddrSpaceManager& mem);
 
   SimResult run(const KernelImage& kernel);
+  SimResult run(const KernelImage& kernel, const LaunchConfig& launch);
 
 private:
   SimConfig cfg_;
