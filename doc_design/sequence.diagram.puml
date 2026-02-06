@@ -1,0 +1,135 @@
+@startuml
+hide footbox
+skinparam shadowing false
+
+actor Host
+participant "Kernel Runtime\n& ABI" as RT
+participant "Stream Manager" as SMgr
+participant "Stream0\nContext+Queue" as S0
+participant "Stream1\nContext+Queue" as S1
+participant "Dependency\nTracker" as Dep
+participant "Copy Engine\n(DMA)" as XEng
+participant "Compute Engine\n(kernel dispatcher)" as CEng
+
+participant "PTX Frontend\n(Parser+Binder+Module)" as FE
+participant "Module/Function\n(InstList+Meta)" as MF
+participant "SM Model" as SM
+participant "Warp Scheduler" as WarpSch
+participant "Executor" as Exec
+participant "InstDesc\nRegistry" as Desc
+participant "Micro-op\nExpander" as Exp
+participant "ExecCore" as Core
+participant "ControlUnit" as Ctrl
+participant "MemUnit" as MemU
+participant "Memory Subsystem\n(AddrSpace+Shared+Global)" as Mem
+
+participant "ObsControl\n(enable/filter/sample)" as OCtrl
+participant "TraceBuffer" as TBuf
+participant "Counters" as Cnt
+
+Host -> RT : createStream() x2
+RT -> SMgr : create Stream0/Stream1
+
+== Enqueue commands ==
+Host -> RT : stream0: memcpyH2D(dst, src, n)
+RT -> S0 : enqueue COPY(H2D)
+RT -> OCtrl : emit(cmd_enq, S0, COPY)
+OCtrl -> TBuf : record() 
+OCtrl -> Cnt : inc(cmd_enq)
+
+Host -> RT : stream0: recordEvent(E)
+RT -> S0 : enqueue EVENT_RECORD(E)
+RT -> OCtrl : emit(cmd_enq, S0, EVENT_RECORD)
+OCtrl -> Cnt : inc(cmd_enq)
+
+Host -> RT : stream1: waitEvent(E)
+RT -> S1 : enqueue EVENT_WAIT(E)
+RT -> OCtrl : emit(cmd_enq, S1, EVENT_WAIT)
+
+Host -> RT : stream1: launchKernel(K,...)
+RT -> FE : load PTX entry + parse stream (once)
+FE --> MF : Module+Function InstList+meta+label index
+RT -> S1 : enqueue KERNEL_LAUNCH(K)
+RT -> OCtrl : emit(cmd_enq, S1, KERNEL)
+
+== Streaming scheduler loop ==
+loop scheduling/tick
+  RT -> Dep : check ready cmds
+  Dep --> RT : ready(COPY on S0), not-ready(S1 wait)
+
+  alt S0 COPY ready
+    RT -> XEng : submit COPY(H2D)
+    XEng -> OCtrl : emit(copy_submit)
+    OCtrl -> Cnt : inc(copy_submit)
+
+    XEng -> Mem : DMA write(global dst)
+    Mem --> XEng : ack
+
+    XEng -> OCtrl : emit(copy_complete)
+    OCtrl -> TBuf : record()
+    OCtrl -> Cnt : inc(copy_complete)
+
+    XEng -> Dep : signal completion token
+  end
+
+  RT -> Dep : execute EVENT_RECORD(E)
+  Dep -> OCtrl : emit(event_record, E)
+  OCtrl -> Cnt : inc(event_record)
+
+  RT -> Dep : execute EVENT_WAIT(E)
+  Dep -> OCtrl : emit(event_wait_done, E)
+  OCtrl -> Cnt : inc(event_wait)
+
+  RT -> CEng : submit KERNEL_LAUNCH(K)
+  CEng -> OCtrl : emit(kernel_submit)
+  OCtrl -> Cnt : inc(kernel_submit)
+  CEng -> SM : enqueue kernel work
+
+  == Kernel execution (simplified) ==
+  loop warp steps
+    SM -> WarpSch : pick_ready_warp()
+    WarpSch -> Exec : run(warp)
+
+    Exec -> MF : fetch InstRecord at PC
+    MF --> Exec : InstRecord
+
+    Exec -> OCtrl : emit(fetch)
+    OCtrl -> Cnt : inc(fetch)
+
+    Exec -> Desc : lookup
+    Desc --> Exec : InstDesc
+    Exec -> Exp : expand -> microOps
+    Exp --> Exec : microOps[]
+
+    loop microOps
+      alt exec-uop
+        Exec -> Core : run
+        Core --> Exec : writeback/pred
+        Core -> OCtrl : emit(exec_uop)
+        OCtrl -> Cnt : inc(exec_uop)
+      else ctrl-uop
+        Exec -> Ctrl : run (PC/mask/stack)
+        Ctrl --> Exec : newPC/newMask
+        Ctrl -> OCtrl : emit(ctrl_uop)
+        OCtrl -> Cnt : inc(ctrl_uop)
+      else mem-uop
+        Exec -> MemU : run
+        MemU -> Mem : read/write/atomic/fence
+        Mem --> MemU : data/ack
+        MemU --> Exec : writeback
+        MemU -> OCtrl : emit(mem_uop)
+        OCtrl -> Cnt : inc(mem_uop)
+      end
+    end
+
+    Exec -> OCtrl : emit(commit)
+    OCtrl -> Cnt : inc(commit)
+  end
+
+  CEng -> OCtrl : emit(kernel_complete)
+  OCtrl -> TBuf : record()
+  OCtrl -> Cnt : inc(kernel_complete)
+
+  CEng -> Dep : signal kernel done
+end
+@enduml

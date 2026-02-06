@@ -1,0 +1,112 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+package "Frontend (lightweight)" {
+  [PTX Lexer/Parser\n(streaming)] as Parser
+  [Directive/Metadata Binder\n(.entry/.func/.reg/.param/.shared/.global)] as Binder
+  [Module Builder\n(Module/Function + InstList + Meta)] as ModB
+
+  Parser --> Binder : tokens / directives / inst records
+  Binder --> ModB : bound insts + metadata
+}
+
+package "Instruction System" {
+  [Inst Descriptor Registry\n(JSON)] as Desc
+  [Micro-op Expander\n(inst -> uops)] as Exp
+  Desc --> Exp : InstDesc
+}
+
+package "Runtime + Streaming" {
+  [Kernel Runtime & ABI\n(Launch/Params/Const)] as RT
+
+  [Stream Manager] as SMgr
+  [Stream Context\n(cmd queue)] as SCtx
+  [Command Queue\n(COPY/KERNEL/EVENT)] as CQ
+  [Dependency Tracker\n(events, waits)] as Dep
+
+  [Compute Engine\n(kernel dispatcher)] as CEng
+  [Copy Engine\nDMA (H2D/D2H/Memset)] as XEng
+
+  RT --> SMgr
+  SMgr --> SCtx
+  SCtx --> CQ
+  CQ --> Dep
+  Dep --> CQ : ready/not-ready
+  CQ --> CEng : submit kernel cmd
+  CQ --> XEng : submit copy cmd
+}
+
+package "SIMT Core" {
+  [SM Model\n(configurable)] as SM
+  [CTA Scheduler] as CtaSch
+  [Warp Scheduler] as WarpSch
+  [Warp Context\n(PC/Mask/ReconvStack)] as WarpCtx
+  [Thread Context\n(Regs/Preds/Local)] as ThrCtx
+  [Executor\n(fetch/decode/dispatch)] as Exec
+
+  SM --> CtaSch
+  CtaSch --> WarpSch
+  WarpSch --> WarpCtx
+  WarpCtx --> ThrCtx
+  WarpSch --> Exec : pick(warp)
+}
+
+package "Base Compute Units (optimized)" {
+  [ExecCore\n(Reg+Pred IO,\nALU/FP, Compare/CVT,\nselect)] as Core
+  [ControlUnit\n(Branch, PC,\nReconvStack)] as Ctrl
+  [MemUnit\n(LD/ST/ATOM,\nFENCE/BARRIER)] as MemU
+
+  note right of Core
+    Extension point:
+    add more uop kinds or
+    plug in extra units later
+  end note
+}
+
+package "Memory Subsystem (No Cache)" {
+  [AddrSpace Manager\n(global/shared/local/const/param)] as ASM
+  [Shared Memory\n(byte-array)] as SHM
+  [Global Memory\n(linear memory model)] as GMEM
+  [Consistency/Fence\n(membar/volatile scope)] as FENCE
+
+  ASM --> SHM
+  ASM --> GMEM
+  FENCE ..> ASM : ordering/visibility
+}
+
+package "Observability (minimal, required)" {
+  [ObsControl\n(enable/filter/sample/\noptional break-conditions)] as OCtrl
+  [TraceBuffer\n(ring buffer / log)] as TBuf
+  [Counters\n(minimal stats)] as Cnt
+
+  OCtrl --> TBuf
+  OCtrl --> Cnt
+}
+
+' ---- Wiring ----
+ModB --> RT : Module + Functions\n(InstList + meta + label index)
+
+CEng --> SM : enqueue CTAs / kernels
+XEng --> GMEM : DMA read/write (no cache)
+
+Exec --> Desc : lookup(opcode,type,mods)
+Exec --> Exp : expand(InstRecord, InstDesc)
+Exp --> Exec : microOps[]
+
+Exec --> Core : dispatch(exec-uop)
+Exec --> Ctrl : dispatch(ctrl-uop)
+Exec --> MemU : dispatch(mem-uop)
+
+MemU --> ASM
+MemU --> FENCE
+
+' ---- Minimal observability connections (single dependency surface) ----
+RT ..> OCtrl : emit(stream_cmd/event)
+CEng ..> OCtrl : emit(kernel_submit/complete)
+XEng ..> OCtrl : emit(copy_submit/complete)
+Exec ..> OCtrl : emit(fetch/commit)
+Core ..> OCtrl : emit(exec_uop)
+Ctrl ..> OCtrl : emit(ctrl_uop)
+MemU ..> OCtrl : emit(mem_uop)
+@enduml
