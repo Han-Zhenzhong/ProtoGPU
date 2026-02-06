@@ -1,0 +1,72 @@
+@startuml ptx_to_ir_mapping_sequence
+' PTX op -> IR op mapping (code-level sequence)
+
+title PTX ops map to IR ops (PtxIsaMapper)
+
+autonumber
+
+actor User
+participant "gpu-sim-cli" as CLI
+participant "Runtime" as RT
+participant "Parser" as Parser
+participant "PtxIsaRegistry" as Isa
+participant "PtxIsaMapper" as Mapper
+participant "DescriptorRegistry" as Desc
+participant "SimtExecutor" as Exec
+
+User -> CLI: run --ptx <file> --ptx-isa <map> --inst-desc <desc>
+CLI -> RT: run_ptx_kernel*(ptx_path, ptx_isa_path, inst_desc_path, ...)
+
+RT -> Parser: parse_ptx_file_tokens(ptx_path)
+Parser --> RT: ModuleTokens / KernelTokens
+note right of Parser
+  Output is tokenized PTX:
+  - ptx_opcode
+  - mods (type_mod/space/flags)
+  - operand_tokens (strings)
+  - optional pred
+end note
+
+RT -> Isa: load_json_file(ptx_isa_path)
+note right of Isa
+  PTX ISA map entry:
+  (ptx_opcode, type_mod, operand_kinds) -> ir_op
+end note
+
+RT -> Mapper: map_kernel(kernel_tokens.insts, Isa)
+loop for each TokenizedPtxInst
+  Mapper -> Isa: candidates(ptx_opcode, type_mod, operand_count)
+  note right of Mapper
+    Candidate ordering:
+    1) exact type_mod match
+    2) wildcard type_mod ("")
+  end note
+
+  Mapper -> Mapper: try-parse operands by operand_kinds
+  alt exactly 1 match
+    Mapper --> RT: InstRecord
+    note right of Mapper
+      InstRecord.opcode = ir_op
+      InstRecord.operands = typed Operands
+      InstRecord.mods/pred/dbg preserved
+    end note
+  else 0 matches
+    Mapper --> RT: Diagnostic OPERAND_FORM_MISMATCH
+  else >1 matches
+    Mapper --> RT: Diagnostic DESC_AMBIGUOUS
+    note right of Mapper
+      message lists all matching signatures:
+      (operand_kinds) -> ir_op.type_mod
+    end note
+  end
+end
+
+RT -> Desc: load_json_file(inst_desc_path)
+RT -> Exec: run(kernel_image)
+note right of Exec
+  Execution uses IR semantics:
+  DescriptorRegistry.lookup(InstRecord)
+  then Expander expands to uops
+end note
+
+@enduml

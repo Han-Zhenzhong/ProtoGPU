@@ -25,6 +25,12 @@
       "ir_op": "ld"
     },
     {
+      "ptx_opcode": "st",
+      "type_mod": "u32",
+      "operand_kinds": ["addr", "reg"],
+      "ir_op": "st"
+    },
+    {
       "ptx_opcode": "ret",
       "type_mod": "",
       "operand_kinds": [],

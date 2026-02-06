@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpusim/abi.h"
 #include "gpusim/contracts.h"
 
 #include <optional>

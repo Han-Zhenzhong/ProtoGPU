@@ -66,6 +66,20 @@ int main(int argc, char** argv) {
       }
 
       outputs = rt.run_ptx_kernel_with_args(args.ptx, args.ptx_isa, args.inst_desc, ka);
+
+      if (outputs.sim.diag) {
+        std::cerr << "Simulation error: " << outputs.sim.diag->module << ":" << outputs.sim.diag->code << " "
+                  << outputs.sim.diag->message << "\n";
+        if (outputs.sim.diag->location) {
+          const auto& loc = *outputs.sim.diag->location;
+          std::cerr << "  at " << loc.file << ":" << loc.line << ":" << loc.column << "\n";
+        }
+        if (outputs.sim.diag->inst_index) {
+          std::cerr << "  inst_index=" << *outputs.sim.diag->inst_index << "\n";
+        }
+        return 2;
+      }
+
       rt.memcpy_d2h(host_out, 0, dev_out, 4);
       auto bytes = rt.host_read(host_out, 0, 4);
       if (bytes && bytes->size() == 4) {
