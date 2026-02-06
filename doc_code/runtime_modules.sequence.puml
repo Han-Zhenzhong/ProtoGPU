@@ -1,0 +1,136 @@
+@startuml runtime_modules
+title gpu-sim (C++ implementation) runtime module interaction
+
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+hide footbox
+
+actor User
+participant "gpu-sim-cli\n(main)" as CLI
+participant "ConfigLoader\nload_app_config_json_file" as Config
+participant "FileIO" as FileIO
+participant "json::parse" as Json
+participant "Runtime" as RT
+participant "Frontend::Parser\nparse_ptx_file" as PtxParser
+participant "Frontend::Binder\nbind_first_kernel" as Binder
+participant "Instruction::DescriptorRegistry\nload_json_file" as RegLoad
+participant "Instruction::DescriptorRegistry\nlookup" as RegLookup
+participant "Instruction::Expander\nexpand" as Expander
+participant "SIMT::SimtExecutor\nrun" as Simt
+participant "Units::ExecCore" as Exec
+participant "Units::ControlUnit" as Ctrl
+participant "Units::MemUnit" as Mem
+participant "Observability::ObsControl" as Obs
+participant "Observability::TraceBuffer" as Trace
+participant "Observability::Counters" as Ctrs
+
+== Process start ==
+
+User -> CLI: run (args)
+CLI -> Config: load_app_config_json_file(configPath)
+Config -> FileIO: slurp(configPath)
+FileIO --> Config: text
+Config -> Json: parse(text)
+Json --> Config: AppConfig
+Config --> CLI: AppConfig
+
+CLI -> RT: Runtime(AppConfig)
+note right of RT
+  Runtime owns:
+  - ObsControl
+  - AddrSpaceManager
+end note
+
+CLI -> RT: run_ptx_kernel(ptxPath, instDescPath)
+
+== Frontend (PTX) ==
+RT -> PtxParser: parse_ptx_file(ptxPath)
+PtxParser -> FileIO: open/read ptxPath
+FileIO --> PtxParser: ptxText
+PtxParser --> RT: ModuleImage
+RT -> Binder: bind_first_kernel(ModuleImage)
+Binder --> RT: KernelImage(insts, reg counts)
+
+== Instruction descriptors (JSON) ==
+RT -> RegLoad: load_json_file(instDescPath)
+RegLoad -> FileIO: open/read instDescPath
+FileIO --> RegLoad: jsonText
+RegLoad -> Json: parse(jsonText)
+Json --> RegLoad: InstDesc list
+RegLoad --> RT: registry loaded
+
+== SIMT execution ==
+RT -> Simt: SimtExecutor(cfg.sim, registry, ObsControl&, AddrSpaceManager&)
+RT -> Simt: run(KernelImage)
+
+loop while (!warp.done && steps < max_steps)
+  Simt -> Obs: emit(Event{cat=FETCH, action=FETCH, pc})
+  Obs -> Trace: push(Event)
+  Simt -> Obs: counter("inst.fetch")
+  Obs -> Ctrs: inc("inst.fetch")
+
+  Simt -> RegLookup: lookup(InstRecord)
+  alt descriptor miss
+    RegLookup --> Simt: nullopt
+    Simt --> RT: SimResult{diag=E_DESC_MISS}
+    break
+  else descriptor hit
+    RegLookup --> Simt: InstDesc
+  end
+
+  Simt -> Expander: expand(inst, desc, warp_size)
+  Expander --> Simt: vector<MicroOp>
+
+  loop for each MicroOp
+    Simt -> Obs: emit(Event{cat=EXEC/CTRL/MEM, action=UOP, pc, opcode_or_uop})
+    Obs -> Trace: push(Event)
+
+    alt uop.kind == Exec
+      Simt -> Exec: step(uop, warp, ObsControl&)
+      Exec -> Obs: counter("uop.exec.*")
+      Obs -> Ctrs: inc(...)
+      Exec --> Simt: StepResult
+    else uop.kind == Control
+      Simt -> Ctrl: step(uop, warp, ObsControl&)
+      Ctrl -> Obs: counter("uop.ctrl.*")
+      Obs -> Ctrs: inc(...)
+      Ctrl --> Simt: StepResult(warp_done possible)
+    else uop.kind == Mem
+      Simt -> Mem: step(uop, warp, ObsControl&)
+      Mem --> Simt: StepResult(diag may be set)
+    end
+
+    alt StepResult.diag is set
+      Simt --> RT: SimResult{diag=StepResult.diag}
+      break
+    end
+  end
+
+  alt warp not done
+    Simt -> Obs: emit(Event{cat=COMMIT, action=COMMIT, pc})
+    Obs -> Trace: push(Event)
+    Simt -> Obs: counter("inst.commit")
+    Obs -> Ctrs: inc("inst.commit")
+  end
+end
+
+Simt --> RT: SimResult{completed/diag, steps}
+RT --> CLI: RunOutputs
+
+== Trace/stats output ==
+CLI -> Obs: trace_snapshot()
+Obs -> Trace: snapshot()
+Trace --> Obs: vector<Event>
+Obs --> CLI: vector<Event>
+
+CLI -> FileIO: write trace.jsonl (event_to_json_line)
+
+CLI -> Obs: counters_snapshot()
+Obs -> Ctrs: snapshot()
+Ctrs --> Obs: vector<(key,value)>
+Obs --> CLI: vector<(key,value)>
+
+CLI -> FileIO: write stats.json (stats_to_json)
+CLI --> User: exit code + message
+
+@enduml

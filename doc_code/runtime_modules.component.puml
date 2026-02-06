@@ -1,0 +1,171 @@
+@startuml runtime_modules_component
+title gpu-sim (C++ implementation) component diagram: interfaces, data flow, data structures
+
+' PlantUML will otherwise treat this as a pure component diagram and
+' reject `class` declarations used to show data contracts/types.
+allowmixing
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+left to right direction
+
+' ===== Components (code modules) =====
+
+package "apps" {
+  component "gpu-sim-cli" as CLI
+}
+
+package "runtime" {
+  component "Runtime" as RT
+}
+
+package "frontend" {
+  component "Parser" as Parser
+  component "Binder" as Binder
+}
+
+package "instruction" {
+  component "DescriptorRegistry" as Reg
+  component "Expander" as Exp
+}
+
+package "simt" {
+  component "SimtExecutor" as Simt
+}
+
+package "units" {
+  component "ExecCore" as Exec
+  component "ControlUnit" as Ctrl
+  component "MemUnit" as MemU
+}
+
+package "memory" {
+  component "AddrSpaceManager" as ASM
+}
+
+package "observability" {
+  component "ObsControl" as Obs
+  component "TraceBuffer" as Trace
+  component "Counters" as Ctrs
+}
+
+package "common" {
+  component "contracts" as Contracts
+  component "json" as Json
+}
+
+component "File IO" as FileIO
+
+' ===== Primary on-disk artifacts =====
+
+artifact "PTX text\nassets/ptx/*.ptx" as PTX
+artifact "Inst desc JSON\nassets/inst_desc/*.json" as DescJson
+artifact "App config JSON\nassets/configs/*.json" as CfgJson
+artifact "Trace JSONL\nout/trace.jsonl" as TraceOut
+artifact "Stats JSON\nout/stats.json" as StatsOut
+
+' ===== Data structures (interfaces) =====
+
+class "AppConfig" as T_AppConfig
+class "ObsConfig" as T_ObsConfig
+class "SimConfig" as T_SimConfig
+class "ModuleImage" as T_ModuleImage
+class "KernelImage" as T_KernelImage
+class "InstRecord" as T_InstRecord
+class "InstDesc" as T_InstDesc
+class "MicroOp" as T_MicroOp
+class "WarpState" as T_WarpState
+class "StepResult" as T_StepResult
+class "Event" as T_Event
+class "Diagnostic" as T_Diag
+
+note as N_contracts
+  Shared data contracts (include/gpusim/contracts.h):
+  - InstRecord / Operand / PredGuard / InstMods
+  - MicroOp / StepResult / Diagnostic
+  - Event (trace record)
+  PC is InstList index
+end note
+
+Contracts .. N_contracts
+
+' ===== Data flow: process start =====
+
+CLI --> FileIO : read configPath
+FileIO --> CfgJson
+CLI --> Json : parse(config JSON)
+Json --> T_AppConfig
+T_AppConfig --> RT : Runtime(AppConfig)
+
+' ===== Runtime orchestration =====
+
+CLI --> RT : run_ptx_kernel(ptxPath, instDescPath)
+
+RT --> Parser : parse_ptx_file(path)
+Parser --> FileIO : read PTX
+FileIO --> PTX
+Parser --> T_ModuleImage
+T_ModuleImage --> Binder : bind_first_kernel(...)
+Binder --> T_KernelImage
+
+RT --> Reg : load_json_file(path)
+Reg --> FileIO : read inst desc
+FileIO --> DescJson
+Reg --> Json : parse(desc JSON)
+Json --> T_InstDesc
+
+RT --> Simt : SimtExecutor(SimConfig, DescriptorRegistry, ObsControl&, AddrSpaceManager&)
+RT --> Obs : owned instance\n(ObsConfig)
+RT --> ASM : owned instance
+
+' ===== SIMT execution data path =====
+
+Simt --> T_KernelImage : run(kernel)
+Simt --> Reg : lookup(InstRecord)
+Reg --> T_InstDesc
+Simt --> Exp : expand(InstRecord, InstDesc, warp_size)
+Exp --> T_MicroOp
+Simt --> Exec : step(MicroOp, WarpState, ObsControl)
+Simt --> Ctrl : step(MicroOp, WarpState, ObsControl)
+Simt --> MemU : step(MicroOp, WarpState, ObsControl)\n(uses AddrSpaceManager)
+MemU --> ASM
+
+Simt --> Obs : emit(Event)\n+ counter(key)
+Obs --> Trace : push/snapshot
+Obs --> Ctrs : inc/snapshot
+Obs --> T_Event
+Obs --> T_Diag
+
+' ===== Outputs =====
+
+CLI --> Obs : trace_snapshot()\n+ counters_snapshot()
+CLI --> FileIO : write trace/stats
+FileIO --> TraceOut
+FileIO --> StatsOut
+
+note right of CLI
+  Trace format: JSON lines\n(event_to_json_line)
+  Stats format: JSON\n(stats_to_json)
+end note
+
+' ===== Type ownership / containment highlights =====
+
+RT ..> T_AppConfig : stores
+RT ..> Obs : owns
+RT ..> ASM : owns
+
+Obs ..> Trace : contains
+Obs ..> Ctrs : contains
+
+T_KernelImage ..> T_InstRecord : insts[*]
+T_ModuleImage ..> T_KernelImage : kernels[*]
+T_InstDesc ..> T_MicroOp : uops[*] (template)
+Simt ..> T_WarpState : local state
+
+legend left
+  Focus:
+  - Module boundaries are code directories under src/ and public headers under include/.
+  - Arrows label runtime data interfaces (types or file artifacts).
+endlegend
+
+@enduml

@@ -43,6 +43,20 @@ EventWaitPayload { event_id }
 
 ---
 
+## 07.1 Kernel I/O + ABI（指引）
+
+本模块只负责“命令入队、依赖、ready 判定与提交”。
+
+与 PTX 执行相关的三类关键数据：
+- 数据输入/输出（H2D/D2H/D2D/Memset）
+- kernel `.param` 参数打包与绑定
+- 结果输出（显式 D2H + 控制结果与同步点）
+
+统一放在独立设计文档中：
+- [doc_design/modules/09_kernel_io_and_abi.md](09_kernel_io_and_abi.md)
+
+---
+
 ## 内部执行流程（Internal Flow）
 
 ### StreamQueue（每 stream FIFO）
@@ -105,3 +119,4 @@ tick():
 ## 验收用例（Smoke tests / Golden traces）
 - 两个 stream：stream0 COPY → recordEvent(E)；stream1 waitEvent(E) → kernel。kernel 不得在 E signaled 前提交。
 - Trace 可复盘 ready/not-ready 与完成链路。
+- 端到端 I/O（见 09 模块）：H2D → launchKernel(params) → D2H → host 校验输出；若失败需可从 diag+trace 定位。

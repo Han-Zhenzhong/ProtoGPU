@@ -1,0 +1,52 @@
+{
+  "insts": [
+    {
+      "opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "ret",
+      "type_mod": "",
+      "operand_kinds": [],
+      "uops": [
+        { "kind": "CTRL", "op": "RET", "in": [], "out": [] }
+      ]
+    },
+    {
+      "opcode": "ld",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "symbol"],
+      "uops": [
+        { "kind": "MEM", "op": "LD", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "st",
+      "type_mod": "u32",
+      "operand_kinds": ["addr", "reg"],
+      "uops": [
+        { "kind": "MEM", "op": "ST", "in": [0, 1], "out": [] }
+      ]
+    }
+  ]
+}

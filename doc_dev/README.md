@@ -30,6 +30,7 @@
 7) SIMT Core
 8) Runtime + Streaming
 9) Engines
+10) Kernel I/O + ABI（跨 Runtime/Engines/Memory）
 
 配置与输入输出约定
 - 运行配置：JSON 文件（路径由 CLI 参数提供）。
@@ -46,9 +47,11 @@
 - `doc_dev/modules/00_contracts.md`
 - `doc_dev/modules/01_observability.md`
 - `doc_dev/modules/02_frontend.md`
+- `doc_dev/modules/02.01_frontend_desc_driven_decode.md`
 - `doc_dev/modules/03_instruction_system.md`
 - `doc_dev/modules/04_memory.md`
 - `doc_dev/modules/05_units.md`
 - `doc_dev/modules/06_simt_core.md`
 - `doc_dev/modules/07_runtime_streaming.md`
 - `doc_dev/modules/08_engines.md`
+- `doc_dev/modules/09_kernel_io_and_abi.md`

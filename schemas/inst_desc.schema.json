@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gpu-sim instruction descriptor",
+  "type": "object",
+  "required": ["insts"],
+  "properties": {
+    "insts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["opcode", "type_mod", "operand_kinds", "uops"],
+        "properties": {
+          "opcode": { "type": "string" },
+          "type_mod": { "type": "string" },
+          "operand_kinds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "uops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "op", "in", "out"],
+              "properties": {
+                "kind": { "type": "string" },
+                "op": { "type": "string" },
+                "in": { "type": "array", "items": { "type": "integer" } },
+                "out": { "type": "array", "items": { "type": "integer" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -17,6 +17,10 @@
 - descriptors（运行输入）：`assets/inst_desc/` 或由 CLI 指定目录。
 - schema（仓库内固定）：`schemas/inst_desc.schema.json`。
 
+补充约定（两层配置，必选模式）
+- PTX ISA map（PTX op → ir_op + operand_kinds）是独立数据集；其候选枚举与解析不由 DescriptorRegistry 负责。
+- DescriptorRegistry 的 opcode 语义为 `ir_op`（IR semantics）。
+
 ---
 
 ## 1. Schema 校验
@@ -43,6 +47,10 @@ lookup(inst_record: InstRecord) -> InstDesc
 - 完全匹配优先于通配。
 - 多个匹配结果 → 失败并返回 Diagnostic（code=`DESC_AMBIGUOUS`）。
 - 无匹配结果 → 失败并返回 Diagnostic（code=`DESC_NOT_FOUND`）。
+
+与 PtxIsaMapper 的接口边界
+- `PtxIsaRegistry`（PTX ISA map）提供 `candidates(ptx_opcode, type_mod, operand_count)` 供映射/解析阶段使用。
+- DescriptorRegistry（inst desc / IR semantics）只提供 `lookup(InstRecord)` 与 expand 所需数据。
 
 ---
 

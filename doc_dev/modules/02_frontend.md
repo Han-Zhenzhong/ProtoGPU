@@ -7,12 +7,16 @@
 落地目标
 - 提供可被 Runtime 调用的“解析并构建 Module”的实现入口。
 - Parser 以 streaming 方式工作；Binder 完成所有符号与 label 绑定。
+- 必须实现 PtxIsaMapper：PTX 指令按 PTX ISA map 映射并解析为 IR `InstRecord`（`opcode==ir_op`），再交由 inst desc（IR semantics）展开 uops。
 
 落地位置（代码）
 - `src/frontend/`
   - parser
   - binder
   - module_builder
+
+相关实现文档
+- `doc_dev/modules/02.01_frontend_desc_driven_decode.md`
 
 ---
 

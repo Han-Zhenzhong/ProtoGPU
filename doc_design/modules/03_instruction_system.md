@@ -21,6 +21,12 @@
   - `InstDesc`（lookup 结果）
   - `MicroOp[]`（expand 结果，含 `guard` 与 `attrs`）
 
+补充说明
+- 采用“PTX ISA map → inst desc(IR semantics)”的强制两层配置后：
+  - `InstRecord.operands[].kind` 由 PTX ISA map 的 `operand_kinds` 驱动确定（由 PtxIsaMapper 完成）。
+  - inst desc 只负责对 `ir_op`（即 `InstRecord.opcode`）做 lookup 与 uops 展开。
+  - 参见：[doc_design/modules/02.01_frontend_desc_driven_decode.md](02.01_frontend_desc_driven_decode.md)。
+
 ---
 
 ## 内部执行流程（Internal Flow）

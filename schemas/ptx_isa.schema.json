@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gpu-sim PTX ISA map",
+  "type": "object",
+  "required": ["insts"],
+  "properties": {
+    "insts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ptx_opcode", "type_mod", "operand_kinds", "ir_op"],
+        "properties": {
+          "ptx_opcode": { "type": "string" },
+          "type_mod": { "type": "string" },
+          "operand_kinds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "ir_op": { "type": "string" }
+        }
+      }
+    }
+  }
+}

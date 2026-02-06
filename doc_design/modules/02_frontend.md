@@ -32,7 +32,7 @@
 Parser 将输入转为“指令/指令外声明”的事件流：
 
 ```text
-ParsedItem := Directive | FunctionBegin | FunctionEnd | InstRecordRaw
+ParsedItem := Directive | FunctionBegin | FunctionEnd | TokenizedPtxInst
 
 parse(ptx_stream) -> iterator<ParsedItem>
 ```
@@ -42,7 +42,15 @@ parse(ptx_stream) -> iterator<ParsedItem>
 - 指令行：`opcode + modifiers + operands + predication`。
 
 输出要求
-- `InstRecordRaw` 必须携带 `dbg`（行号/文件）以便错误定位。
+- `TokenizedPtxInst` 必须携带 `dbg`（行号/文件）以便错误定位。
+
+### PtxIsaMapper（PTX→IR 映射/解析，必须）
+为满足“PTX op → inst desc(opcode key/ir_op) 映射是唯一必选模式”的需求，必须引入 PtxIsaMapper 阶段：
+
+- 输入：`TokenizedPtxInst + PtxIsaRegistry(PTX ISA map)`
+- 输出：`InstRecord`（其中 `InstRecord.opcode == ir_op`，operands.kind/type 已确定），或 `Diagnostic`
+
+详见设计文档：[doc_design/modules/02.01_frontend_desc_driven_decode.md](02.01_frontend_desc_driven_decode.md)
 
 ### Binder（Directive/Metadata Binder）
 Binder 消费 `ParsedItem`，构建 function-local 与 module-level 的布局与符号：
