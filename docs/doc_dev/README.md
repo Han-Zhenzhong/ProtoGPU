@@ -53,7 +53,9 @@
 - `doc_dev/modules/05_units.md`
 - `doc_dev/modules/06_simt_core.md`
 - `doc_dev/modules/06.01_launch_grid_block_3d.md`
+- `doc_dev/modules/06.02_sm_parallel_execution.md`
 - `doc_dev/modules/07_runtime_streaming.md`
 - `doc_dev/modules/07.01_stream_input_workload_spec.md`
 - `doc_dev/modules/08_engines.md`
 - `doc_dev/modules/09_kernel_io_and_abi.md`
+- `doc_dev/modules/10_modular_hw_sw_mapping.md`

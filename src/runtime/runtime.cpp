@@ -66,6 +66,52 @@ AppConfig load_app_config_json_text(const std::string& text) {
     if (auto* det = so.find("deterministic") != so.end() ? &so.at("deterministic") : nullptr) {
       cfg.sim.deterministic = det->as_bool();
     }
+
+    if (auto* cs = so.find("cta_scheduler") != so.end() ? &so.at("cta_scheduler") : nullptr) {
+      cfg.sim.cta_scheduler = cs->as_string();
+    }
+    if (auto* wsched = so.find("warp_scheduler") != so.end() ? &so.at("warp_scheduler") : nullptr) {
+      cfg.sim.warp_scheduler = wsched->as_string();
+    }
+    if (auto* allow = so.find("allow_unknown_selectors") != so.end() ? &so.at("allow_unknown_selectors") : nullptr) {
+      cfg.sim.allow_unknown_selectors = allow->as_bool();
+    }
+  }
+
+  // Memory model selector (kept separate for future expansion).
+  if (auto* mem = o.find("memory") != o.end() ? &o.at("memory") : nullptr) {
+    const auto& mo = mem->as_object();
+    if (auto* model = mo.find("model") != mo.end() ? &mo.at("model") : nullptr) {
+      cfg.sim.memory_model = model->as_string();
+    }
+  }
+
+  // Architecture profile (preferred; can override sim.* selectors).
+  if (auto* arch = o.find("arch") != o.end() ? &o.at("arch") : nullptr) {
+    const auto& ao = arch->as_object();
+    if (auto* prof = ao.find("profile") != ao.end() ? &ao.at("profile") : nullptr) {
+      cfg.sim.profile = prof->as_string();
+
+      // Profile defaults (baseline only for now).
+      if (cfg.sim.profile == "baseline_no_cache") {
+        cfg.sim.cta_scheduler = "fifo";
+        cfg.sim.warp_scheduler = "in_order_run_to_completion";
+        cfg.sim.memory_model = "no_cache_addrspace";
+      }
+    }
+
+    if (auto* comps = ao.find("components") != ao.end() ? &ao.at("components") : nullptr) {
+      const auto& co = comps->as_object();
+      if (auto* cs = co.find("cta_scheduler") != co.end() ? &co.at("cta_scheduler") : nullptr) {
+        cfg.sim.cta_scheduler = cs->as_string();
+      }
+      if (auto* wsched = co.find("warp_scheduler") != co.end() ? &co.at("warp_scheduler") : nullptr) {
+        cfg.sim.warp_scheduler = wsched->as_string();
+      }
+      if (auto* mm = co.find("memory_model") != co.end() ? &co.at("memory_model") : nullptr) {
+        cfg.sim.memory_model = mm->as_string();
+      }
+    }
   }
   if (auto* obs = o.find("observability") != o.end() ? &o.at("observability") : nullptr) {
     const auto& oo = obs->as_object();

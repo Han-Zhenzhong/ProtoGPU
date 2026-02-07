@@ -3,6 +3,7 @@
 说明
 - 本文只描述抽象逻辑：提交/推进/tick、完成信号与与 SIMT/Mem 的交互。
 - 设计基准：与 [doc_design/arch_modules_block.diagram.puml](../arch_modules_block.diagram.puml) 与 [doc_design/sequence.diagram.puml](../sequence.diagram.puml) 对齐；若文本与图冲突，以图为准。
+- 多 SM 并行执行（每 SM 一个软件线程）详见：[doc_design/modules/06.02_sm_parallel_execution.md](06.02_sm_parallel_execution.md)
 
 ---
 

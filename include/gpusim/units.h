@@ -39,11 +39,11 @@ public:
 
 class MemUnit final {
 public:
-  explicit MemUnit(AddrSpaceManager& mem) : mem_(mem) {}
+  explicit MemUnit(IMemoryModel& mem) : mem_(mem) {}
   StepResult step(const MicroOp& uop, WarpState& warp, ObsControl& obs);
 
 private:
-  AddrSpaceManager& mem_;
+  IMemoryModel& mem_;
 };
 
 } // namespace gpusim

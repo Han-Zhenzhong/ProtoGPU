@@ -1,0 +1,24 @@
+{
+  "sim": {
+    "warp_size": 32,
+    "max_steps": 100000,
+
+    "sm_count": 2,
+    "parallel": true,
+    "deterministic": false,
+
+    "allow_unknown_selectors": false
+  },
+  "arch": {
+    "profile": "baseline_no_cache",
+    "components": {
+      "cta_scheduler": "sm_round_robin",
+      "warp_scheduler": "round_robin_interleave_step",
+      "memory_model": "no_cache_addrspace"
+    }
+  },
+  "observability": {
+    "enabled": true,
+    "trace_capacity": 200000
+  }
+}

@@ -21,9 +21,11 @@ add_library(gpusim_core
   src/units/mem_unit.cpp
   src/simt/simt.cpp
   src/runtime/deps.cpp
+  src/runtime/cta_scheduler.cpp
   src/runtime/engines.cpp
   src/runtime/runtime.cpp
   src/runtime/workload.cpp
+  src/simt/warp_scheduler.cpp
 )
 
 target_include_directories(gpusim_core PUBLIC

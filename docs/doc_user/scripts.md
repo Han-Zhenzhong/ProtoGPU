@@ -56,7 +56,9 @@ bash scripts/run_unit_tests.sh build
 用途：运行 `gpu-sim-cli` 的 demo 路径并做最小校验：
 
 - smoke：运行 demo kernel（检查 trace/stats 产物存在且非空）
+- trace 元信息：检查 trace 包含一次性 `RUN_START`（用于观测 profile/components 组合）
 - io-demo：运行 `--io-demo`（检查 stdout 包含 `io-demo u32 result: 42`）
+- modular selectors：运行 `assets/configs/demo_modular_selectors.json` 并检查选择器字符串在 trace 中可观察
 
 Windows（cmd）
 

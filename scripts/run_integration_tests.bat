@@ -35,6 +35,7 @@ set PTX_ISA=assets\ptx_isa\demo_ptx8.json
 set INST_DESC=assets\inst_desc\demo_desc.json
 set CONFIG_JSON=assets\configs\demo_config.json
 set PAR_CONFIG_JSON=assets\configs\demo_parallel_config.json
+set MODSEL_CONFIG_JSON=assets\configs\demo_modular_selectors.json
 
 echo [integration] smoke run: demo_kernel.ptx
 "%CLI%" --ptx "%PTX%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%CONFIG_JSON%" --trace "%OUT_DIR%\trace.jsonl" --stats "%OUT_DIR%\stats.json" 1>"%OUT_DIR%\stdout.txt" 2>"%OUT_DIR%\stderr.txt"
@@ -52,6 +53,12 @@ for %%F in ("%OUT_DIR%\trace.jsonl" "%OUT_DIR%\stats.json") do (
     echo error: missing output file: %%~F
     exit /b 1
   )
+)
+
+findstr /c:"\"action\":\"RUN_START\"" "%OUT_DIR%\trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected RUN_START in trace (config_summary missing?)
+  exit /b 1
 )
 
 echo [integration] sm parallel smoke: demo_parallel_config.json
@@ -75,6 +82,42 @@ for %%F in ("%OUT_DIR%\trace_parallel.jsonl" "%OUT_DIR%\stats_parallel.json") do
 findstr /c:"\"sm_id\":" "%OUT_DIR%\trace_parallel.jsonl" >nul
 if errorlevel 1 (
   echo error: expected sm_id in parallel trace (did parallel mode run?)
+  exit /b 1
+)
+
+echo [integration] modular selectors smoke: demo_modular_selectors.json
+"%CLI%" --ptx "%PTX%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%MODSEL_CONFIG_JSON%" --grid 4,1,1 --block 32,1,1 --trace "%OUT_DIR%\trace_modsel.jsonl" --stats "%OUT_DIR%\stats_modsel.json" 1>"%OUT_DIR%\stdout_modsel.txt" 2>"%OUT_DIR%\stderr_modsel.txt"
+if errorlevel 1 (
+  echo error: modular selectors smoke run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\stdout_modsel.txt) ---
+  type "%OUT_DIR%\stdout_modsel.txt"
+  echo --- stderr (%OUT_DIR%\stderr_modsel.txt) ---
+  type "%OUT_DIR%\stderr_modsel.txt"
+  exit /b %errorlevel%
+)
+
+for %%F in ("%OUT_DIR%\trace_modsel.jsonl" "%OUT_DIR%\stats_modsel.json") do (
+  if not exist %%~F (
+    echo error: missing output file: %%~F
+    exit /b 1
+  )
+)
+
+findstr /c:"\"action\":\"RUN_START\"" "%OUT_DIR%\trace_modsel.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected RUN_START in modular selectors trace
+  exit /b 1
+)
+
+findstr /c:"sm_round_robin" "%OUT_DIR%\trace_modsel.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected cta_scheduler=sm_round_robin to be observable
+  exit /b 1
+)
+
+findstr /c:"round_robin_interleave_step" "%OUT_DIR%\trace_modsel.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected warp_scheduler=round_robin_interleave_step to be observable
   exit /b 1
 )
 

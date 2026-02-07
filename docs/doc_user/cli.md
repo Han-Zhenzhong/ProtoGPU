@@ -43,6 +43,13 @@
 `gpu-sim-cli` 支持“每 SM 一个宿主线程”的并行执行基线，配置与限制见：
 - [doc_user/sm_parallel_execution.md](sm_parallel_execution.md)
 
+## 模块化架构选择（10：profile/components）
+
+如果你希望“只改配置就切换 CTA/warp 调度策略与内存模型选择器”，参照：
+- [doc_user/modular_hw_sw_mapping.md](modular_hw_sw_mapping.md)
+
+提示：运行时 trace 会写入一次性的 `RUN_START` 事件，用于观察本次运行实际选择了哪些组件组合。
+
 ## WorkloadSpec（--workload：streams/commands）
 
 用途

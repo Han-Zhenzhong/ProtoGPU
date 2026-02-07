@@ -8,6 +8,7 @@
 > 4) **不仿真 cache 架构**：内存模型为 AddrSpace + Shared + Global（线性内存）  
 > 5) **指令执行可组合**：按指令描述文件将指令展开为 micro-ops，由基础执行单元执行  
 > 6) **观测能力（必需）**：TraceBuffer + Counters + ObsControl（过滤/采样/开关）
+  7) **硬件块 → 软件模块映射**：按块图对齐可替换模块，支持配置组合新架构（见 [doc_design/modules/10_modular_hw_sw_mapping.md](modules/10_modular_hw_sw_mapping.md)）
 
 设计基准
 - 架构与模块关系以 doc_design 下的 PUML 图为准（尤其是 arch_modules_block.diagram.puml 与 sequence.diagram.puml）；若文本与图存在冲突，以图为准。

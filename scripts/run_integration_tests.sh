@@ -55,6 +55,7 @@ PTX_ISA="assets/ptx_isa/demo_ptx8.json"
 INST_DESC="assets/inst_desc/demo_desc.json"
 CONFIG_JSON="assets/configs/demo_config.json"
 PAR_CONFIG_JSON="assets/configs/demo_parallel_config.json"
+MODSEL_CONFIG_JSON="assets/configs/demo_modular_selectors.json"
 
 echo "[integration] smoke run: demo_kernel.ptx"
 set +e
@@ -84,6 +85,13 @@ if [[ ! -s "$OUT_DIR/trace.jsonl" ]]; then
 fi
 if [[ ! -s "$OUT_DIR/stats.json" ]]; then
   echo "error: missing/empty stats: $OUT_DIR/stats.json" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"action":"RUN_START"' "$OUT_DIR/trace.jsonl"; then
+  echo "error: expected RUN_START in trace (config_summary missing?)" >&2
+  echo "--- tail ($OUT_DIR/trace.jsonl) ---" >&2
+  tail -n 50 "$OUT_DIR/trace.jsonl" >&2 || true
   exit 1
 fi
 
@@ -120,6 +128,47 @@ if ! grep -Fq '"sm_id":' "$OUT_DIR/trace_parallel.jsonl"; then
   echo "error: expected sm_id in parallel trace (did parallel mode run?)" >&2
   echo "--- tail ($OUT_DIR/trace_parallel.jsonl) ---" >&2
   tail -n 50 "$OUT_DIR/trace_parallel.jsonl" >&2 || true
+  exit 1
+fi
+
+echo "[integration] modular selectors smoke: demo_modular_selectors.json"
+set +e
+"$CLI" \
+  --ptx "$PTX" \
+  --ptx-isa "$PTX_ISA" \
+  --inst-desc "$INST_DESC" \
+  --config "$MODSEL_CONFIG_JSON" \
+  --grid 4,1,1 \
+  --block 32,1,1 \
+  --trace "$OUT_DIR/trace_modsel.jsonl" \
+  --stats "$OUT_DIR/stats_modsel.json" \
+  >"$OUT_DIR/stdout_modsel.txt" 2>"$OUT_DIR/stderr_modsel.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: modular selectors smoke run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/stdout_modsel.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stdout_modsel.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/stderr_modsel.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stderr_modsel.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/trace_modsel.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/trace_modsel.jsonl" >&2
+  exit 1
+fi
+if ! grep -Fq '"action":"RUN_START"' "$OUT_DIR/trace_modsel.jsonl"; then
+  echo "error: expected RUN_START in modular selectors trace" >&2
+  exit 1
+fi
+if ! grep -Fq "sm_round_robin" "$OUT_DIR/trace_modsel.jsonl"; then
+  echo "error: expected cta_scheduler=sm_round_robin to be observable" >&2
+  exit 1
+fi
+if ! grep -Fq "round_robin_interleave_step" "$OUT_DIR/trace_modsel.jsonl"; then
+  echo "error: expected warp_scheduler=round_robin_interleave_step to be observable" >&2
   exit 1
 fi
 

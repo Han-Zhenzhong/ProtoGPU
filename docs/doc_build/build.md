@@ -127,6 +127,68 @@ cmake --build build -j
 
 ---
 
+## 模块化架构选择（10：HW/SW Mapping）
+
+本项目支持通过配置文件选择“可替换模块/策略”，用于把不同的软件实现组合成一个目标架构（见设计/实现文档：
+- `docs/doc_design/modules/10_modular_hw_sw_mapping.md`
+- `docs/doc_dev/modules/10_modular_hw_sw_mapping.md`
+）
+
+### 配置入口（Selectors / Profile）
+
+目前支持以下选择入口（保持向后兼容）：
+
+- `sim.cta_scheduler`：CTA 分发策略（默认 `fifo`）
+- `sim.warp_scheduler`：warp issue 策略（默认 `in_order_run_to_completion`）
+- `memory.model`：内存模型选择器（默认 `no_cache_addrspace`）
+- `sim.allow_unknown_selectors`：unknown selector 是否允许（默认 `false`，即默认严格模式）
+
+更推荐的写法是使用：
+
+- `arch.profile`：架构 profile 名称（当前提供 `baseline_no_cache`）
+- `arch.components`：组件选择覆盖（优先级高于 `sim.*` selectors）
+
+仓库内提供了一个演示配置：
+- `assets/configs/demo_modular_selectors.json`
+  - 启用 2 个 SM 并行
+  - `cta_scheduler=sm_round_robin`
+  - `warp_scheduler=round_robin_interleave_step`
+
+### 运行示例
+
+（从仓库根目录，Ninja/Unix Makefiles）
+
+```bash
+./build/gpu-sim-cli \
+  --config assets/configs/demo_modular_selectors.json \
+  --ptx assets/ptx/demo_kernel.ptx \
+  --ptx-isa assets/ptx_isa/demo_ptx8.json \
+  --inst-desc assets/inst_desc/demo_desc.json \
+  --grid 4,1,1 \
+  --block 32,1,1 \
+  --trace out/modsel.trace.jsonl \
+  --stats out/modsel.stats.json
+```
+
+（Visual Studio multi-config）
+
+```bat
+build\Release\gpu-sim-cli.exe --config assets\configs\demo_modular_selectors.json --grid 4,1,1 --block 32,1,1
+```
+
+### 如何确认“选择生效”（Trace）
+
+trace 中会出现一次性的 `RUN_START` 事件，`extra` 字段携带 config_summary（profile/components/sm_count/parallel/deterministic）。
+
+你可以用 scripts 的集成测试做最小验证（见 `docs/doc_user/scripts.md`）：
+
+- Windows：`scripts\run_integration_tests.bat build`
+- Bash：`bash scripts/run_integration_tests.sh build`
+
+其中会检查：
+- trace 含 `"action":"RUN_START"`
+- modular selectors trace 中能观察到 `sm_round_robin` 与 `round_robin_interleave_step`
+
 ## 3D Kernel Launch（grid/block）
 
 `gpu-sim-cli` 支持以 3D `grid_dim` / `block_dim` 形式启动 kernel（对齐 `doc_design/modules/06.01_launch_grid_block_3d.md` 的抽象语义）。

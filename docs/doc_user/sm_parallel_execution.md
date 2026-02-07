@@ -6,6 +6,9 @@
 - 抽象设计：`doc_design/modules/06.02_sm_parallel_execution.md`
 - 实现落地：`doc_dev/modules/06.02_sm_parallel_execution.md`
 
+相关：如果你希望通过配置选择不同的 CTA 分发策略 / warp 调度策略（并在 trace 中观察差异），见：
+- `docs/doc_user/modular_hw_sw_mapping.md`
+
 ---
 
 ## 1. 如何启用
