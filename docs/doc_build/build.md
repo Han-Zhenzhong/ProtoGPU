@@ -70,7 +70,7 @@ cmake --build build -j
 `gpu-sim-cli` 默认参数使用仓库内的相对路径资源：
 
 - PTX：`assets/ptx/demo_kernel.ptx`
-- PTX ISA map：`assets/ptx_isa/demo_ptx8.json`
+- PTX ISA map：`assets/ptx_isa/demo_ptx64.json`
 - 指令描述：`assets/inst_desc/demo_desc.json`
 - 配置：`assets/configs/demo_config.json`
 
@@ -94,7 +94,7 @@ cmake --build build -j
 ```bash
 ./build/gpu-sim-cli \
   --ptx assets/ptx/demo_kernel.ptx \
-  --ptx-isa assets/ptx_isa/demo_ptx8.json \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
   --inst-desc assets/inst_desc/demo_desc.json \
   --config assets/configs/demo_config.json \
   --trace out/trace.jsonl \
@@ -162,7 +162,7 @@ cmake --build build -j
 ./build/gpu-sim-cli \
   --config assets/configs/demo_modular_selectors.json \
   --ptx assets/ptx/demo_kernel.ptx \
-  --ptx-isa assets/ptx_isa/demo_ptx8.json \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
   --inst-desc assets/inst_desc/demo_desc.json \
   --grid 4,1,1 \
   --block 32,1,1 \

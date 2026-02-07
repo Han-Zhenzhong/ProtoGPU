@@ -11,7 +11,7 @@
   "modules": {
     "demo": {
       "ptx": "assets/ptx/demo_kernel.ptx",
-      "ptx_isa": "assets/ptx_isa/demo_ptx8.json",
+      "ptx_isa": "assets/ptx_isa/demo_ptx64.json",
       "inst_desc": "assets/inst_desc/demo_desc.json"
     }
   },

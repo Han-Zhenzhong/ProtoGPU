@@ -51,7 +51,7 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 PTX="assets/ptx/demo_kernel.ptx"
-PTX_ISA="assets/ptx_isa/demo_ptx8.json"
+PTX_ISA="assets/ptx_isa/demo_ptx64.json"
 INST_DESC="assets/inst_desc/demo_desc.json"
 CONFIG_JSON="assets/configs/demo_config.json"
 PAR_CONFIG_JSON="assets/configs/demo_parallel_config.json"

@@ -14,7 +14,7 @@ namespace {
 
 struct Args final {
   std::string ptx = "assets/ptx/demo_kernel.ptx";
-  std::string ptx_isa = "assets/ptx_isa/demo_ptx8.json";
+  std::string ptx_isa = "assets/ptx_isa/demo_ptx64.json";
   std::string inst_desc = "assets/inst_desc/demo_desc.json";
   std::string config = "assets/configs/demo_config.json";
   std::string trace_out = "out/trace.jsonl";

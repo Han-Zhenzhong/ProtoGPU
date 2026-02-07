@@ -31,7 +31,7 @@ if exist "%OUT_DIR%" rmdir /s /q "%OUT_DIR%"
 mkdir "%OUT_DIR%" >nul
 
 set PTX=assets\ptx\demo_kernel.ptx
-set PTX_ISA=assets\ptx_isa\demo_ptx8.json
+set PTX_ISA=assets\ptx_isa\demo_ptx64.json
 set INST_DESC=assets\inst_desc\demo_desc.json
 set CONFIG_JSON=assets\configs\demo_config.json
 set PAR_CONFIG_JSON=assets\configs\demo_parallel_config.json

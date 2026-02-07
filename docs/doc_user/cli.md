@@ -20,7 +20,7 @@
 
 在仓库根目录运行时，默认使用：
 - PTX：`assets/ptx/demo_kernel.ptx`
-- PTX ISA map：`assets/ptx_isa/demo_ptx8.json`
+- PTX ISA map：`assets/ptx_isa/demo_ptx64.json`
 - 指令描述（inst_desc）：`assets/inst_desc/demo_desc.json`
 - 配置：`assets/configs/demo_config.json`
 
@@ -29,7 +29,7 @@
 ```bash
 ./build/gpu-sim-cli \
   --ptx assets/ptx/demo_kernel.ptx \
-  --ptx-isa assets/ptx_isa/demo_ptx8.json \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
   --inst-desc assets/inst_desc/demo_desc.json \
   --config assets/configs/demo_config.json \
   --grid 1,1,1 \
@@ -139,7 +139,7 @@ SIMT 侧会对 CTA/warp/lane 做确定性枚举，并为部分 warp 设置 `acti
 
 ## PTX op → IR op 映射（`--ptx-isa`）
 
-用户侧只需要关心“PTX8 的指令长什么样，映射到哪个通用 IR opcode”。这一步由 `--ptx-isa` 提供的 PTX ISA map 完成：
+用户侧只需要关心“PTX（当前工程基线为 6.4）的指令长什么样，映射到哪个通用 IR opcode”。这一步由 `--ptx-isa` 提供的 PTX ISA map 完成：
 
 - `ptx_opcode`：PTX 指令名（例如 `mov/add/ld/ret`）
 - `type_mod`：类型修饰（例如 `u32/u64`；空字符串表示 wildcard）

@@ -119,7 +119,7 @@
 ./build/gpu-sim-cli \
   --config assets/configs/demo_modular_selectors.json \
   --ptx assets/ptx/demo_kernel.ptx \
-  --ptx-isa assets/ptx_isa/demo_ptx8.json \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
   --inst-desc assets/inst_desc/demo_desc.json \
   --grid 4,1,1 \
   --block 32,1,1 \

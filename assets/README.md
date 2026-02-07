@@ -41,7 +41,7 @@
 
 默认 demo 组合见：
 - `ptx/demo_kernel.ptx`
-- `ptx_isa/demo_ptx8.json`
+- `ptx_isa/demo_ptx64.json`
 - `inst_desc/demo_desc.json`
 
 ---

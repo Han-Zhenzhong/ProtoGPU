@@ -1,0 +1,46 @@
+{
+  "insts": [
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "imm"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "special"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "symbol"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "add",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "ld",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "symbol"],
+      "ir_op": "ld"
+    },
+    {
+      "ptx_opcode": "st",
+      "type_mod": "u32",
+      "operand_kinds": ["addr", "reg"],
+      "ir_op": "st"
+    },
+    {
+      "ptx_opcode": "ret",
+      "type_mod": "",
+      "operand_kinds": [],
+      "ir_op": "ret"
+    }
+  ]
+}
