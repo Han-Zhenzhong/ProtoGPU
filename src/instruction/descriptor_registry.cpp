@@ -10,17 +10,21 @@ namespace gpusim {
 static MicroOpOp parse_uop_op(const std::string& s) {
   if (s == "MOV") return MicroOpOp::Mov;
   if (s == "ADD") return MicroOpOp::Add;
+  if (s == "MUL") return MicroOpOp::Mul;
+  if (s == "FMA") return MicroOpOp::Fma;
+  if (s == "SETP") return MicroOpOp::Setp;
   if (s == "LD") return MicroOpOp::Ld;
   if (s == "ST") return MicroOpOp::St;
+  if (s == "BRA") return MicroOpOp::Bra;
   if (s == "RET") return MicroOpOp::Ret;
-  return MicroOpOp::Mov;
+  throw std::runtime_error("DescriptorRegistry: unknown uop op: " + s);
 }
 
 static MicroOpKind parse_uop_kind(const std::string& s) {
   if (s == "EXEC") return MicroOpKind::Exec;
   if (s == "CTRL") return MicroOpKind::Control;
   if (s == "MEM") return MicroOpKind::Mem;
-  return MicroOpKind::Exec;
+  throw std::runtime_error("DescriptorRegistry: unknown uop kind: " + s);
 }
 
 std::string operand_kind_to_string(OperandKind k) {

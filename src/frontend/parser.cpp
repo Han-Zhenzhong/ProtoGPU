@@ -4,6 +4,7 @@
 #include <cctype>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
 
 namespace gpusim {
 
@@ -363,6 +364,7 @@ ModuleImage Parser::parse_ptx_text(const std::string& ptx_text) {
         if (lt != std::string::npos && gt != std::string::npos && gt > lt + 1) {
           auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
           if (type == ".u32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+          if (type == ".f32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
           if (type == ".u64") cur.reg_u64_count = std::max(cur.reg_u64_count, count);
         }
       }
@@ -385,6 +387,7 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
   bool in_entry = false;
   bool in_body = false;
   KernelTokens cur;
+  std::vector<std::pair<std::int64_t, std::string>> body_lines;
   std::int64_t line_no = 0;
 
   while (std::getline(in, line)) {
@@ -395,6 +398,7 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
       in_entry = true;
       in_body = false;
       cur = KernelTokens{};
+      body_lines.clear();
       auto pos = t.find(".entry");
       auto after = trim(t.substr(pos + 6));
       auto name_end = after.find('(');
@@ -402,6 +406,63 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
       continue;
     }
     if (in_entry && t == "}") {
+      // Two-pass kernel body processing: bind labels to PC, then tokenize and rewrite bra label -> imm(pc).
+      std::unordered_map<std::string, PC> label_to_pc;
+      PC pc = 0;
+
+      for (const auto& it : body_lines) {
+        std::string s = it.second;
+        if (auto pos = s.find("//"); pos != std::string::npos) s = s.substr(0, pos);
+        s = trim(s);
+        if (s.empty()) continue;
+
+        if (starts_with(s, ".reg")) {
+          auto a = split_ws(s);
+          if (a.size() >= 3) {
+            auto type = a[1];
+            auto decl = a[2];
+            auto lt = decl.find('<');
+            auto gt = decl.find('>');
+            if (lt != std::string::npos && gt != std::string::npos && gt > lt + 1) {
+              auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
+              if (type == ".u32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+              if (type == ".f32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+              if (type == ".u64") cur.reg_u64_count = std::max(cur.reg_u64_count, count);
+            }
+          }
+          continue;
+        }
+
+        if (s[0] == '.' || s[0] == '{') continue;
+        if (!s.empty() && s.back() == ':') {
+          auto name = trim(s.substr(0, s.size() - 1));
+          if (!name.empty()) label_to_pc[name] = pc;
+          continue;
+        }
+        pc += 1;
+      }
+
+      for (const auto& it : body_lines) {
+        const auto body_line_no = it.first;
+        std::string s = it.second;
+        if (auto pos = s.find("//"); pos != std::string::npos) s = s.substr(0, pos);
+        s = trim(s);
+        if (s.empty()) continue;
+        if (starts_with(s, ".reg")) continue;
+        if (s[0] == '.' || s[0] == '{') continue;
+        if (!s.empty() && s.back() == ':') continue;
+
+        auto inst = tokenize_inst_line(s, file_name, body_line_no);
+        if (!inst.ptx_opcode.empty() && inst.ptx_opcode == "bra" && inst.operand_tokens.size() == 1) {
+          const auto label = trim(inst.operand_tokens[0]);
+          auto itpc = label_to_pc.find(label);
+          if (itpc != label_to_pc.end()) {
+            inst.operand_tokens[0] = std::to_string(itpc->second);
+          }
+        }
+        if (!inst.ptx_opcode.empty()) cur.insts.push_back(std::move(inst));
+      }
+
       in_entry = false;
       in_body = false;
       m.kernels.push_back(std::move(cur));
@@ -424,25 +485,8 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
       continue;
     }
 
-    if (starts_with(t, ".reg")) {
-      auto a = split_ws(t);
-      if (a.size() >= 3) {
-        auto type = a[1];
-        auto decl = a[2];
-        auto lt = decl.find('<');
-        auto gt = decl.find('>');
-        if (lt != std::string::npos && gt != std::string::npos && gt > lt + 1) {
-          auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
-          if (type == ".u32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
-          if (type == ".u64") cur.reg_u64_count = std::max(cur.reg_u64_count, count);
-        }
-      }
-      continue;
-    }
-
-    if (t[0] == '.' || t[0] == '{') continue;
-    auto inst = tokenize_inst_line(t, file_name, line_no);
-    if (!inst.ptx_opcode.empty()) cur.insts.push_back(std::move(inst));
+    // Defer all body processing to kernel-end two-pass (needed for forward label references).
+    body_lines.emplace_back(line_no, t);
   }
 
   return m;

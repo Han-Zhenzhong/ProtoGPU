@@ -1,0 +1,29 @@
+.version 6.4
+.target sm_70
+.address_size 64
+
+.visible .entry m4_bra_loop_u32(
+    .param .u64 out
+)
+{
+    .reg .u32 %r<6>;
+    .reg .u64 %rd<2>;
+    .reg .pred %p<1>;
+
+    ld.param.u64 %rd0, [out];
+
+    mov.u32 %r0, 0;
+    mov.u32 %r1, 3;
+    mov.u32 %r2, 1;
+    mov.u32 %r3, -1;
+    mov.u32 %r4, 0;
+
+loop:
+    add.u32 %r0, %r0, %r2;
+    add.u32 %r1, %r1, %r3;
+    setp.ne.s32 %p0, %r1, %r4;
+    @%p0 bra loop;
+
+    st.global.u32 [%rd0], %r0;
+    ret;
+}

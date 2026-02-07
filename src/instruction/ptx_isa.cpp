@@ -40,6 +40,17 @@ bool parse_u64_dec(const std::string& s, std::int64_t& out) {
   return true;
 }
 
+bool parse_u32_hex_exact(const std::string& s, std::uint32_t& out) {
+  if (s.size() != 8) return false;
+  if (!std::all_of(s.begin(), s.end(), [](unsigned char ch) { return std::isxdigit(ch); })) return false;
+  try {
+    out = static_cast<std::uint32_t>(std::stoul(s, nullptr, 16));
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 std::string join_csv(const std::vector<std::string>& xs) {
   std::string out;
   for (std::size_t i = 0; i < xs.size(); i++) {
@@ -82,6 +93,15 @@ std::optional<Operand> parse_operand_by_kind(const std::string& kind,
       o.kind = OperandKind::Reg;
       o.type = ValueType::U64;
       o.reg_id = id;
+    } else if (tok.rfind("%f", 0) == 0) {
+      std::int64_t id = -1;
+      if (!parse_u64_dec(tok.substr(2), id)) {
+        diag = Diagnostic{ "frontend", "OPERAND_PARSE_FAIL", "invalid %f register: " + tok, loc, std::nullopt, std::nullopt };
+        return std::nullopt;
+      }
+      o.kind = OperandKind::Reg;
+      o.type = ValueType::F32;
+      o.reg_id = id;
     } else if (tok.rfind("%r", 0) == 0) {
       std::int64_t id = -1;
       if (!parse_u64_dec(tok.substr(2), id)) {
@@ -114,6 +134,19 @@ std::optional<Operand> parse_operand_by_kind(const std::string& kind,
   }
 
   if (kind == "imm") {
+    // nvcc-style float32 bit-pattern immediates: 0fXXXXXXXX
+    if (tok.size() == 10 && (tok.rfind("0f", 0) == 0 || tok.rfind("0F", 0) == 0)) {
+      std::uint32_t bits = 0;
+      if (!parse_u32_hex_exact(tok.substr(2), bits)) {
+        diag = Diagnostic{ "frontend", "OPERAND_PARSE_FAIL", "invalid f32 immediate: " + tok, loc, std::nullopt, std::nullopt };
+        return std::nullopt;
+      }
+      o.kind = OperandKind::Imm;
+      o.type = ValueType::F32;
+      o.imm_i64 = static_cast<std::int64_t>(static_cast<std::uint64_t>(bits));
+      return o;
+    }
+
     std::int64_t v = 0;
     if (!parse_i64_auto_base(tok, v)) return std::nullopt;
     o.kind = OperandKind::Imm;

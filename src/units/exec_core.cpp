@@ -1,6 +1,8 @@
 #include "gpusim/units.h"
 
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 
 namespace gpusim {
@@ -92,6 +94,25 @@ static std::optional<std::uint64_t> read_operand_lane(const Operand& o,
   return 0u;
 }
 
+static float f32_from_bits(std::uint32_t bits) {
+  float f = 0.0f;
+  std::memcpy(&f, &bits, sizeof(float));
+  return f;
+}
+
+static std::uint32_t f32_to_bits(float f) {
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &f, sizeof(float));
+  return bits;
+}
+
+static bool has_flag(const std::vector<std::string>& flags, const char* name) {
+  for (const auto& f : flags) {
+    if (f == name) return true;
+  }
+  return false;
+}
+
 } // namespace
 
 StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
@@ -142,6 +163,176 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
       write_reg_lane(uop.outputs[0], warp, lane, (*a) + (*b));
     }
     obs.counter("uop.exec.add");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::Mul: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 2) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "MUL expects 2 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    if (uop.attrs.type == ValueType::F32) {
+      for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+        if (!lane_mask_test(exec_mask, lane)) continue;
+        auto a_bits = read_operand_lane(uop.inputs[0], warp, lane);
+        auto b_bits = read_operand_lane(uop.inputs[1], warp, lane);
+        if (!a_bits.has_value() || !b_bits.has_value()) {
+          r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+          r.blocked_reason = BlockedReason::Error;
+          return r;
+        }
+        const float a = f32_from_bits(static_cast<std::uint32_t>(*a_bits));
+        const float b = f32_from_bits(static_cast<std::uint32_t>(*b_bits));
+        const float out = a * b;
+        write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(f32_to_bits(out)));
+      }
+      obs.counter("uop.exec.mul.f32");
+      r.progressed = true;
+      return r;
+    }
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto a = read_operand_lane(uop.inputs[0], warp, lane);
+      auto b = read_operand_lane(uop.inputs[1], warp, lane);
+      if (!a.has_value() || !b.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      const bool signed_mul = (uop.attrs.type == ValueType::S32 || uop.attrs.type == ValueType::S64);
+      const bool wide_out = (uop.outputs[0].type == ValueType::U64 || uop.outputs[0].type == ValueType::S64);
+
+      if (signed_mul) {
+        const std::int64_t aa = static_cast<std::int32_t>(static_cast<std::uint32_t>(*a));
+        const std::int64_t bb = static_cast<std::int32_t>(static_cast<std::uint32_t>(*b));
+        const std::int64_t prod = aa * bb;
+        if (wide_out) write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(prod));
+        else write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(static_cast<std::uint32_t>(prod)));
+      } else {
+        const std::uint64_t aa = static_cast<std::uint32_t>(*a);
+        const std::uint64_t bb = static_cast<std::uint32_t>(*b);
+        const std::uint64_t prod = aa * bb;
+        if (wide_out) write_reg_lane(uop.outputs[0], warp, lane, prod);
+        else write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint32_t>(prod));
+      }
+    }
+
+    obs.counter("uop.exec.mul");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::Fma: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 3) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "FMA expects 3 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+    if (uop.attrs.type != ValueType::F32) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_TYPE", "FMA only supports f32 in this milestone", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto a_bits = read_operand_lane(uop.inputs[0], warp, lane);
+      auto b_bits = read_operand_lane(uop.inputs[1], warp, lane);
+      auto c_bits = read_operand_lane(uop.inputs[2], warp, lane);
+      if (!a_bits.has_value() || !b_bits.has_value() || !c_bits.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      const float a = f32_from_bits(static_cast<std::uint32_t>(*a_bits));
+      const float b = f32_from_bits(static_cast<std::uint32_t>(*b_bits));
+      const float c = f32_from_bits(static_cast<std::uint32_t>(*c_bits));
+      const float out = std::fma(a, b, c);
+      write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(f32_to_bits(out)));
+    }
+    obs.counter("uop.exec.fma.f32");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::Setp: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 2) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "SETP expects 2 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+    if (uop.outputs[0].kind != OperandKind::Pred || uop.outputs[0].pred_id < 0) {
+      r.diag = Diagnostic{ "units.exec", "E_OPERAND_KIND", "SETP output must be a predicate", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    const bool do_lt = has_flag(uop.attrs.flags, "lt");
+    const bool do_le = has_flag(uop.attrs.flags, "le");
+    const bool do_gt = has_flag(uop.attrs.flags, "gt");
+    const bool do_ge = has_flag(uop.attrs.flags, "ge");
+    const bool do_eq = has_flag(uop.attrs.flags, "eq");
+    const bool do_ne = has_flag(uop.attrs.flags, "ne");
+
+    int op_count = (do_lt ? 1 : 0) + (do_le ? 1 : 0) + (do_gt ? 1 : 0) + (do_ge ? 1 : 0) + (do_eq ? 1 : 0) + (do_ne ? 1 : 0);
+    if (op_count == 0) {
+      // Default for bring-up: lt
+    } else if (op_count > 1) {
+      r.diag = Diagnostic{ "units.exec", "E_SETP_FLAGS", "SETP has multiple compare flags", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    const auto warp_size = warp.active.width;
+    const auto pid = static_cast<std::size_t>(uop.outputs[0].pred_id);
+    const auto base = pid * static_cast<std::size_t>(warp_size);
+    if (warp_size == 0 || warp_size > 32) {
+      r.diag = Diagnostic{ "units.exec", "E_WARP_SIZE", "invalid warp_size", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+    if (base + warp_size > warp.p.size()) {
+      r.diag = Diagnostic{ "units.exec", "E_PRED_OOB", "predicate id out of range", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto a = read_operand_lane(uop.inputs[0], warp, lane);
+      auto b = read_operand_lane(uop.inputs[1], warp, lane);
+      if (!a.has_value() || !b.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      bool pred = false;
+      if (uop.attrs.type == ValueType::S32 || uop.attrs.type == ValueType::S64) {
+        const auto aa = static_cast<std::int32_t>(static_cast<std::uint32_t>(*a));
+        const auto bb = static_cast<std::int32_t>(static_cast<std::uint32_t>(*b));
+        if (do_le) pred = aa <= bb;
+        else if (do_gt) pred = aa > bb;
+        else if (do_ge) pred = aa >= bb;
+        else if (do_eq) pred = aa == bb;
+        else if (do_ne) pred = aa != bb;
+        else pred = aa < bb;
+      } else {
+        const auto aa = static_cast<std::uint32_t>(*a);
+        const auto bb = static_cast<std::uint32_t>(*b);
+        if (do_le) pred = aa <= bb;
+        else if (do_gt) pred = aa > bb;
+        else if (do_ge) pred = aa >= bb;
+        else if (do_eq) pred = aa == bb;
+        else if (do_ne) pred = aa != bb;
+        else pred = aa < bb;
+      }
+      warp.p[base + lane] = pred ? 1 : 0;
+    }
+    obs.counter("uop.exec.setp");
     r.progressed = true;
     return r;
   }

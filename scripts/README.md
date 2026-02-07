@@ -15,6 +15,9 @@
 - 单元测试：运行 `gpu-sim-tests` / `ctest`
 - 集成测试：运行 `gpu-sim-cli` 的 demo 路径并校验关键输出/产物
 
+同时，测试脚本会包含一个 tiny GPT-2 bring-up 的最小端到端回归（CTests）：
+- `gpu-sim-tiny-gpt2-mincov-tests`
+
 默认约定 build 目录为 `build/`；你也可以传入自定义 build 目录作为第一个参数。
 
 ### Windows（cmd）

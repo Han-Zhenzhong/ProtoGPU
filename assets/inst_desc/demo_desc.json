@@ -33,6 +33,14 @@
       ]
     },
     {
+      "opcode": "add",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
       "opcode": "ret",
       "type_mod": "",
       "operand_kinds": [],
@@ -49,11 +57,83 @@
       ]
     },
     {
+      "opcode": "ld",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "symbol"],
+      "uops": [
+        { "kind": "MEM", "op": "LD", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "ld",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "addr"],
+      "uops": [
+        { "kind": "MEM", "op": "LD", "in": [1], "out": [0] }
+      ]
+    },
+    {
       "opcode": "st",
       "type_mod": "u32",
       "operand_kinds": ["addr", "reg"],
       "uops": [
         { "kind": "MEM", "op": "ST", "in": [0, 1], "out": [] }
+      ]
+    },
+    {
+      "opcode": "st",
+      "type_mod": "f32",
+      "operand_kinds": ["addr", "reg"],
+      "uops": [
+        { "kind": "MEM", "op": "ST", "in": [0, 1], "out": [] }
+      ]
+    },
+    {
+      "opcode": "mul",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "MUL", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mul",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "MUL", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "fma",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "FMA", "in": [1, 2, 3], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "fma",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "FMA", "in": [1, 2, 3], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "setp",
+      "type_mod": "s32",
+      "operand_kinds": ["pred", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "SETP", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "bra",
+      "type_mod": "",
+      "operand_kinds": ["imm"],
+      "uops": [
+        { "kind": "CTRL", "op": "BRA", "in": [0], "out": [] }
       ]
     }
   ]

@@ -105,14 +105,19 @@ enum class MicroOpKind : std::uint8_t { Exec, Control, Mem };
 enum class MicroOpOp : std::uint16_t {
   Mov,
   Add,
+  Mul,
+  Fma,
+  Setp,
   Ld,
   St,
+  Bra,
   Ret,
 };
 
 struct MicroOpAttrs final {
   ValueType type = ValueType::U32;
   AddrSpace space = AddrSpace::Global;
+  std::vector<std::string> flags;
 };
 
 struct MicroOp final {
@@ -131,6 +136,7 @@ struct StepResult final {
   bool warp_done = false;
   BlockedReason blocked_reason = BlockedReason::None;
   std::optional<Diagnostic> diag;
+  std::optional<PC> next_pc;
 };
 
 struct MemResult final {

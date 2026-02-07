@@ -62,6 +62,16 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-config-parse-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-config-parse-tests COMMAND gpu-sim-config-parse-tests)
 
+  add_executable(gpu-sim-tiny-gpt2-mincov-tests
+    tests/tiny_gpt2_minimal_coverage_tests.cpp
+  )
+  target_link_libraries(gpu-sim-tiny-gpt2-mincov-tests PRIVATE gpusim_core)
+  add_test(
+    NAME gpu-sim-tiny-gpt2-mincov-tests
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}
+            $<TARGET_FILE:gpu-sim-tiny-gpt2-mincov-tests>
+  )
+
   add_test(
     NAME gpu-sim-workload-smoke-single-stream
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}

@@ -16,7 +16,7 @@ if not exist "%BUILD_DIR%" (
 where ctest >nul 2>nul
 if %errorlevel%==0 (
   echo [unit] running via ctest (unit-only; build dir: %BUILD_DIR%, config: %CONFIG%)
-  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests)$"
+  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
   exit /b %errorlevel%
 )
 
@@ -27,6 +27,7 @@ for %%N in (
   gpu-sim-tests
   gpu-sim-builtins-tests
   gpu-sim-config-parse-tests
+  gpu-sim-tiny-gpt2-mincov-tests
 ) do (
   set EXE=
   for %%P in (

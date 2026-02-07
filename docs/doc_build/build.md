@@ -325,5 +325,38 @@ ctest --test-dir build -C Release -V
 ```
 
 Workload smoke tests（若启用 BUILD_TESTING）
-- `gpu-sim-workload-smoke-single-stream`
-- `gpu-sim-workload-smoke-two-stream-event`
+
+---
+
+## tiny GPT-2 bring-up：最小覆盖回归（M1–M4）
+
+仓库内提供了一个端到端回归，用于确保 tiny GPT-2 bring-up 所需的最小闭环持续可用：
+- CTest：`gpu-sim-tiny-gpt2-mincov-tests`
+
+它覆盖：
+- M1：`ld/st.global.f32` + `fma.f32` + predication
+- M4：`bra` loop（uniform control-flow）
+
+### 运行方式（推荐）
+
+Windows（cmd）：
+
+```bat
+scripts\run_unit_tests.bat build
+scripts\run_integration_tests.bat build
+```
+
+Bash（Git Bash / WSL / Linux / macOS）：
+
+```bash
+bash scripts/run_unit_tests.sh build
+bash scripts/run_integration_tests.sh build
+```
+
+### 直接跑 CTest
+
+```bash
+ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
+```
+
+更多说明见用户文档：`docs/doc_user/tiny_gpt2_minimal_coverage.md`。

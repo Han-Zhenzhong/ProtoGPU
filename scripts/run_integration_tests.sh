@@ -26,6 +26,11 @@ if [[ $need_build -eq 1 ]]; then
   BUILD_TESTING=ON bash "$SCRIPT_DIR/build.sh" "$BUILD_DIR" "$CONFIG"
 fi
 
+if command -v ctest >/dev/null 2>&1; then
+  echo "[integration] running tiny GPT-2 minimal coverage via ctest (build dir: $BUILD_DIR, config: $CONFIG)"
+  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
+fi
+
 CLI_CANDIDATES=(
   "$BUILD_DIR/gpu-sim-cli"
   "$BUILD_DIR/gpu-sim-cli.exe"

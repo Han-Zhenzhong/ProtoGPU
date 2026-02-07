@@ -261,13 +261,61 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       }
 
       auto uops = expander_.expand(inst, *desc, warp_size);
+
+      // Apply instruction-level predication by intersecting each uop.guard with a predicate mask.
+      if (inst.pred.has_value()) {
+        const auto pid_i64 = inst.pred->pred_id;
+        if (pid_i64 < 0) {
+          const auto d = Diagnostic{ "simt", "E_PRED_OOB", "predicate id out of range", inst.dbg, kernel.name, warp.pc };
+          if (diag_mu && diag_out) {
+            std::lock_guard<std::mutex> lock(*diag_mu);
+            *diag_out = d;
+          } else {
+            res.diag = d;
+          }
+          if (scheduler) scheduler->request_stop();
+          return;
+        }
+        const auto pid = static_cast<std::size_t>(pid_i64);
+        const auto base = pid * static_cast<std::size_t>(warp_size);
+        if (base + warp_size > warp.p.size()) {
+          const auto d = Diagnostic{ "simt", "E_PRED_OOB", "predicate id out of range", inst.dbg, kernel.name, warp.pc };
+          if (diag_mu && diag_out) {
+            std::lock_guard<std::mutex> lock(*diag_mu);
+            *diag_out = d;
+          } else {
+            res.diag = d;
+          }
+          if (scheduler) scheduler->request_stop();
+          return;
+        }
+
+        LaneMask pred_mask;
+        pred_mask.width = warp_size;
+        pred_mask.bits_lo = 0u;
+        for (std::uint32_t lane = 0; lane < warp_size && lane < 32; lane++) {
+          if (!lane_mask_test(warp.active, lane)) continue;
+          const bool pval = warp.p[base + lane] != 0;
+          const bool enabled = inst.pred->is_negated ? (!pval) : pval;
+          if (enabled) pred_mask.bits_lo |= (1u << lane);
+        }
+        for (auto& u : uops) {
+          u.guard = lane_mask_and(u.guard, pred_mask);
+        }
+      }
+
+      std::optional<PC> next_pc;
       for (const auto& uop : uops) {
         auto uop_name = [&]() -> std::string {
           switch (uop.op) {
           case MicroOpOp::Mov: return "MOV";
           case MicroOpOp::Add: return "ADD";
+          case MicroOpOp::Mul: return "MUL";
+          case MicroOpOp::Fma: return "FMA";
+          case MicroOpOp::Setp: return "SETP";
           case MicroOpOp::Ld: return "LD";
           case MicroOpOp::St: return "ST";
+          case MicroOpOp::Bra: return "BRA";
           case MicroOpOp::Ret: return "RET";
           }
           return "UOP";
@@ -281,9 +329,42 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
                         warp.pc, warp.active, uop_name, std::nullopt, std::nullopt, std::nullopt });
 
         StepResult sr;
-        if (uop.kind == MicroOpKind::Exec) sr = exec_.step(uop, warp, obs_);
-        else if (uop.kind == MicroOpKind::Control) sr = ctrl_.step(uop, warp, obs_);
-        else sr = mem_unit_.step(uop, warp, obs_);
+        if (uop.kind == MicroOpKind::Exec) {
+          sr = exec_.step(uop, warp, obs_);
+        } else if (uop.kind == MicroOpKind::Control) {
+          if (uop.op == MicroOpOp::Bra || uop.op == MicroOpOp::Ret) {
+            const auto m = lane_mask_and(warp.active, uop.guard);
+            if (m.bits_lo != 0u && m.bits_lo != warp.active.bits_lo) {
+              const auto d = Diagnostic{ "simt", "E_DIVERGENCE_UNSUPPORTED", "divergent control-flow is unsupported in this milestone", inst.dbg, kernel.name, warp.pc };
+              if (diag_mu && diag_out) {
+                std::lock_guard<std::mutex> lock(*diag_mu);
+                *diag_out = d;
+              } else {
+                res.diag = d;
+              }
+              if (scheduler) scheduler->request_stop();
+              return;
+            }
+          }
+          sr = ctrl_.step(uop, warp, obs_);
+        } else {
+          sr = mem_unit_.step(uop, warp, obs_);
+        }
+
+        if (sr.next_pc.has_value()) {
+          if (next_pc.has_value() && *next_pc != *sr.next_pc) {
+            const auto d = Diagnostic{ "simt", "E_NEXT_PC_CONFLICT", "multiple control uops set next_pc", inst.dbg, kernel.name, warp.pc };
+            if (diag_mu && diag_out) {
+              std::lock_guard<std::mutex> lock(*diag_mu);
+              *diag_out = d;
+            } else {
+              res.diag = d;
+            }
+            if (scheduler) scheduler->request_stop();
+            return;
+          }
+          next_pc = *sr.next_pc;
+        }
 
         if (sr.diag) {
           if (diag_mu && diag_out) {
@@ -298,10 +379,12 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       }
 
       if (!warp.done) {
-        warp.pc += 1;
+        const auto old_pc = warp.pc;
+        if (next_pc.has_value()) warp.pc = *next_pc;
+        else warp.pc = old_pc + 1;
         obs_.emit(Event{ next_ts_local(), EventCategory::Commit, "COMMIT",
                         std::nullopt, item.cta_id, warp_id, std::nullopt, sm_id, std::nullopt, std::nullopt, std::nullopt,
-                        warp.pc - 1, warp.active, inst.opcode, std::nullopt, std::nullopt, std::nullopt });
+                        old_pc, warp.active, inst.opcode, std::nullopt, std::nullopt, std::nullopt });
         obs_.counter("inst.commit");
       }
 

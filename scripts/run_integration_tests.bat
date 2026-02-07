@@ -13,6 +13,13 @@ if not exist "%BUILD_DIR%" (
   exit /b 2
 )
 
+where ctest >nul 2>nul
+if %errorlevel%==0 (
+  echo [integration] running tiny GPT-2 minimal coverage via ctest (build dir: %BUILD_DIR%, config: %CONFIG%)
+  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
+  if errorlevel 1 exit /b %errorlevel%
+)
+
 set CLI=
 for %%P in (
   "%BUILD_DIR%\gpu-sim-cli.exe"

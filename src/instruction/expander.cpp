@@ -23,6 +23,7 @@ std::vector<MicroOp> Expander::expand(const InstRecord& inst, const InstDesc& de
     u.op = t.op;
     u.attrs.type = ty;
     u.attrs.space = sp;
+    u.attrs.flags = inst.mods.flags;
     u.guard = lane_mask_all(warp_size);
     for (int idx : t.in_operand_idx) {
       if (idx < 0 || static_cast<std::size_t>(idx) >= inst.operands.size()) continue;

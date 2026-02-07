@@ -48,8 +48,11 @@ bash scripts/run_unit_tests.sh build
 
 说明
 
-- 脚本优先使用 `ctest --test-dir <build>`；若系统没有 ctest，则直接尝试运行 `gpu-sim-tests` 可执行文件。
+- 脚本优先使用 `ctest --test-dir <build>`；若系统没有 ctest，则直接尝试运行单元测试可执行文件。
 - Visual Studio / Xcode 等 multi-config 生成器可通过 `CONFIG=Debug|Release` 选择配置。
+
+当前也会包含一个 tiny GPT-2 bring-up 的最小端到端回归：
+- `gpu-sim-tiny-gpt2-mincov-tests`（M1 fma/ld/st/predication + M4 bra loop）
 
 ## 集成测试
 
@@ -59,6 +62,9 @@ bash scripts/run_unit_tests.sh build
 - trace 元信息：检查 trace 包含一次性 `RUN_START`（用于观测 profile/components 组合）
 - io-demo：运行 `--io-demo`（检查 stdout 包含 `io-demo u32 result: 42`）
 - modular selectors：运行 `assets/configs/demo_modular_selectors.json` 并检查选择器字符串在 trace 中可观察
+
+同时（若系统存在 `ctest`）也会运行：
+- `gpu-sim-tiny-gpt2-mincov-tests`（tiny GPT-2 最小覆盖回归）
 
 Windows（cmd）
 
