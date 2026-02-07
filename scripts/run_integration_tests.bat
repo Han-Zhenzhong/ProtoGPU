@@ -34,6 +34,7 @@ set PTX=assets\ptx\demo_kernel.ptx
 set PTX_ISA=assets\ptx_isa\demo_ptx8.json
 set INST_DESC=assets\inst_desc\demo_desc.json
 set CONFIG_JSON=assets\configs\demo_config.json
+set PAR_CONFIG_JSON=assets\configs\demo_parallel_config.json
 
 echo [integration] smoke run: demo_kernel.ptx
 "%CLI%" --ptx "%PTX%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%CONFIG_JSON%" --trace "%OUT_DIR%\trace.jsonl" --stats "%OUT_DIR%\stats.json" 1>"%OUT_DIR%\stdout.txt" 2>"%OUT_DIR%\stderr.txt"
@@ -51,6 +52,30 @@ for %%F in ("%OUT_DIR%\trace.jsonl" "%OUT_DIR%\stats.json") do (
     echo error: missing output file: %%~F
     exit /b 1
   )
+)
+
+echo [integration] sm parallel smoke: demo_parallel_config.json
+"%CLI%" --ptx "%PTX%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%PAR_CONFIG_JSON%" --grid 4,1,1 --block 32,1,1 --trace "%OUT_DIR%\trace_parallel.jsonl" --stats "%OUT_DIR%\stats_parallel.json" 1>"%OUT_DIR%\stdout_parallel.txt" 2>"%OUT_DIR%\stderr_parallel.txt"
+if errorlevel 1 (
+  echo error: sm parallel smoke run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\stdout_parallel.txt) ---
+  type "%OUT_DIR%\stdout_parallel.txt"
+  echo --- stderr (%OUT_DIR%\stderr_parallel.txt) ---
+  type "%OUT_DIR%\stderr_parallel.txt"
+  exit /b %errorlevel%
+)
+
+for %%F in ("%OUT_DIR%\trace_parallel.jsonl" "%OUT_DIR%\stats_parallel.json") do (
+  if not exist %%~F (
+    echo error: missing output file: %%~F
+    exit /b 1
+  )
+)
+
+findstr /c:"\"sm_id\":" "%OUT_DIR%\trace_parallel.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected sm_id in parallel trace (did parallel mode run?)
+  exit /b 1
 )
 
 echo [integration] io-demo: write_out.ptx

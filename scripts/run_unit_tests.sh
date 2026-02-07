@@ -27,27 +27,46 @@ if [[ $need_build -eq 1 ]]; then
 fi
 
 if command -v ctest >/dev/null 2>&1; then
-  echo "[unit] running via ctest (build dir: $BUILD_DIR, config: $CONFIG)"
-  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V
+  echo "[unit] running via ctest (unit-only; build dir: $BUILD_DIR, config: $CONFIG)"
+  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests)$"
   exit 0
 fi
 
-echo "[unit] ctest not found; trying to run gpu-sim-tests directly" >&2
+echo "[unit] ctest not found; running unit test executables directly" >&2
 
-CANDIDATES=(
-  "$BUILD_DIR/gpu-sim-tests"
-  "$BUILD_DIR/gpu-sim-tests.exe"
-  "$BUILD_DIR/$CONFIG/gpu-sim-tests"
-  "$BUILD_DIR/$CONFIG/gpu-sim-tests.exe"
+TESTS=(
+  "gpu-sim-tests"
+  "gpu-sim-builtins-tests"
+  "gpu-sim-config-parse-tests"
 )
 
-for exe in "${CANDIDATES[@]}"; do
-  if [[ -f "$exe" ]]; then
-    echo "[unit] running: $exe"
-    "$exe"
-    exit 0
+ran_any=0
+for name in "${TESTS[@]}"; do
+  CANDIDATES=(
+    "$BUILD_DIR/$name"
+    "$BUILD_DIR/$name.exe"
+    "$BUILD_DIR/$CONFIG/$name"
+    "$BUILD_DIR/$CONFIG/$name.exe"
+  )
+
+  found=""
+  for exe in "${CANDIDATES[@]}"; do
+    if [[ -f "$exe" ]]; then
+      found="$exe"
+      break
+    fi
+  done
+
+  if [[ -n "$found" ]]; then
+    ran_any=1
+    echo "[unit] running: $found"
+    "$found"
   fi
 done
 
-echo "error: cannot find gpu-sim-tests under $BUILD_DIR (config=$CONFIG)" >&2
-exit 2
+if [[ $ran_any -eq 0 ]]; then
+  echo "error: cannot find unit test executables under $BUILD_DIR (config=$CONFIG)" >&2
+  exit 2
+fi
+
+echo "OK"

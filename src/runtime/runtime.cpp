@@ -56,6 +56,16 @@ AppConfig load_app_config_json_text(const std::string& text) {
     if (auto* ms = so.find("max_steps") != so.end() ? &so.at("max_steps") : nullptr) {
       cfg.sim.max_steps = ms->as_u64();
     }
+
+    if (auto* sc = so.find("sm_count") != so.end() ? &so.at("sm_count") : nullptr) {
+      cfg.sim.sm_count = static_cast<std::uint32_t>(sc->as_u64());
+    }
+    if (auto* par = so.find("parallel") != so.end() ? &so.at("parallel") : nullptr) {
+      cfg.sim.parallel = par->as_bool();
+    }
+    if (auto* det = so.find("deterministic") != so.end() ? &so.at("deterministic") : nullptr) {
+      cfg.sim.deterministic = det->as_bool();
+    }
   }
   if (auto* obs = o.find("observability") != o.end() ? &o.at("observability") : nullptr) {
     const auto& oo = obs->as_object();

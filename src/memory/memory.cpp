@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <mutex>
+
 namespace gpusim {
 
 static std::uint64_t align_up(std::uint64_t v, std::uint64_t a) {
@@ -11,6 +13,7 @@ static std::uint64_t align_up(std::uint64_t v, std::uint64_t a) {
 }
 
 DevicePtr AddrSpaceManager::alloc_global(std::uint64_t bytes, std::uint64_t align) {
+  std::lock_guard<std::mutex> lock(mu_);
   if (align == 0) align = 1;
   next_global_addr_ = align_up(next_global_addr_, align);
   auto base = next_global_addr_;
@@ -20,12 +23,14 @@ DevicePtr AddrSpaceManager::alloc_global(std::uint64_t bytes, std::uint64_t alig
 }
 
 void AddrSpaceManager::write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) {
+  std::lock_guard<std::mutex> lock(mu_);
   for (std::size_t i = 0; i < bytes.size(); i++) {
     global_[addr + static_cast<std::uint64_t>(i)] = bytes[i];
   }
 }
 
 std::optional<std::vector<std::uint8_t>> AddrSpaceManager::read_global(std::uint64_t addr, std::uint64_t size) const {
+  std::lock_guard<std::mutex> lock(mu_);
   std::vector<std::uint8_t> out;
   out.reserve(static_cast<std::size_t>(size));
   for (std::uint64_t i = 0; i < size; i++) {
@@ -37,6 +42,7 @@ std::optional<std::vector<std::uint8_t>> AddrSpaceManager::read_global(std::uint
 }
 
 void AddrSpaceManager::set_param_layout(const std::vector<ParamDesc>& layout) {
+  std::lock_guard<std::mutex> lock(mu_);
   param_layout_.clear();
   for (const auto& p : layout) {
     param_layout_.emplace(p.name, p);
@@ -44,10 +50,12 @@ void AddrSpaceManager::set_param_layout(const std::vector<ParamDesc>& layout) {
 }
 
 void AddrSpaceManager::set_param_blob(const std::vector<std::uint8_t>& blob) {
+  std::lock_guard<std::mutex> lock(mu_);
   param_blob_ = blob;
 }
 
 std::optional<std::vector<std::uint8_t>> AddrSpaceManager::read_param_symbol(const std::string& name, std::uint64_t size) const {
+  std::lock_guard<std::mutex> lock(mu_);
   auto it = param_layout_.find(name);
   if (it == param_layout_.end()) return std::nullopt;
   const auto& p = it->second;

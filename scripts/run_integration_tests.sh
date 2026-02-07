@@ -54,6 +54,7 @@ PTX="assets/ptx/demo_kernel.ptx"
 PTX_ISA="assets/ptx_isa/demo_ptx8.json"
 INST_DESC="assets/inst_desc/demo_desc.json"
 CONFIG_JSON="assets/configs/demo_config.json"
+PAR_CONFIG_JSON="assets/configs/demo_parallel_config.json"
 
 echo "[integration] smoke run: demo_kernel.ptx"
 set +e
@@ -83,6 +84,42 @@ if [[ ! -s "$OUT_DIR/trace.jsonl" ]]; then
 fi
 if [[ ! -s "$OUT_DIR/stats.json" ]]; then
   echo "error: missing/empty stats: $OUT_DIR/stats.json" >&2
+  exit 1
+fi
+
+echo "[integration] sm parallel smoke: demo_parallel_config.json"
+set +e
+"$CLI" \
+  --ptx "$PTX" \
+  --ptx-isa "$PTX_ISA" \
+  --inst-desc "$INST_DESC" \
+  --config "$PAR_CONFIG_JSON" \
+  --grid 4,1,1 \
+  --block 32,1,1 \
+  --trace "$OUT_DIR/trace_parallel.jsonl" \
+  --stats "$OUT_DIR/stats_parallel.json" \
+  >"$OUT_DIR/stdout_parallel.txt" 2>"$OUT_DIR/stderr_parallel.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: sm parallel smoke run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/stdout_parallel.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stdout_parallel.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/stderr_parallel.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stderr_parallel.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/trace_parallel.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/trace_parallel.jsonl" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"sm_id":' "$OUT_DIR/trace_parallel.jsonl"; then
+  echo "error: expected sm_id in parallel trace (did parallel mode run?)" >&2
+  echo "--- tail ($OUT_DIR/trace_parallel.jsonl) ---" >&2
+  tail -n 50 "$OUT_DIR/trace_parallel.jsonl" >&2 || true
   exit 1
 fi
 

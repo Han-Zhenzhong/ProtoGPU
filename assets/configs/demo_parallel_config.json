@@ -1,0 +1,14 @@
+{
+  "sim": {
+    "warp_size": 32,
+    "max_steps": 100000,
+
+    "sm_count": 2,
+    "parallel": true,
+    "deterministic": false
+  },
+  "observability": {
+    "enabled": true,
+    "trace_capacity": 65536
+  }
+}

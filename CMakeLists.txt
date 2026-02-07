@@ -54,6 +54,12 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-builtins-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-builtins-tests COMMAND gpu-sim-builtins-tests)
 
+  add_executable(gpu-sim-config-parse-tests
+    tests/config_parse_tests.cpp
+  )
+  target_link_libraries(gpu-sim-config-parse-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-config-parse-tests COMMAND gpu-sim-config-parse-tests)
+
   add_test(
     NAME gpu-sim-workload-smoke-single-stream
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}

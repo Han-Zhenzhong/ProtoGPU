@@ -38,6 +38,11 @@
   --stats out/stats.json
 ```
 
+## 多 SM 并行执行（06.02）
+
+`gpu-sim-cli` 支持“每 SM 一个宿主线程”的并行执行基线，配置与限制见：
+- [doc_user/sm_parallel_execution.md](sm_parallel_execution.md)
+
 ## WorkloadSpec（--workload：streams/commands）
 
 用途

@@ -15,24 +15,42 @@ if not exist "%BUILD_DIR%" (
 
 where ctest >nul 2>nul
 if %errorlevel%==0 (
-  echo [unit] running via ctest (build dir: %BUILD_DIR%, config: %CONFIG%)
-  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V
+  echo [unit] running via ctest (unit-only; build dir: %BUILD_DIR%, config: %CONFIG%)
+  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests)$"
   exit /b %errorlevel%
 )
 
-set EXE=
-for %%P in (
-  "%BUILD_DIR%\gpu-sim-tests.exe"
-  "%BUILD_DIR%\%CONFIG%\gpu-sim-tests.exe"
+set FAIL=0
+set RAN_ANY=0
+
+for %%N in (
+  gpu-sim-tests
+  gpu-sim-builtins-tests
+  gpu-sim-config-parse-tests
 ) do (
-  if exist %%~P set EXE=%%~P
+  set EXE=
+  for %%P in (
+    "%BUILD_DIR%\%%N.exe"
+    "%BUILD_DIR%\%CONFIG%\%%N.exe"
+  ) do (
+    if exist %%~P set EXE=%%~P
+  )
+
+  if not "!EXE!"=="" (
+    set RAN_ANY=1
+    echo [unit] running: !EXE!
+    "!EXE!"
+    if errorlevel 1 (
+      set FAIL=!errorlevel!
+      goto :done
+    )
+  )
 )
 
-if "%EXE%"=="" (
-  echo error: cannot find gpu-sim-tests.exe under %BUILD_DIR% (config=%CONFIG%)
+:done
+if %RAN_ANY%==0 (
+  echo error: cannot find unit test executables under %BUILD_DIR% (config=%CONFIG%)
   exit /b 2
 )
 
-echo [unit] running: %EXE%
-"%EXE%"
-exit /b %errorlevel%
+exit /b %FAIL%

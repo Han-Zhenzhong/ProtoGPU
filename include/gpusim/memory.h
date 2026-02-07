@@ -4,6 +4,7 @@
 #include "gpusim/contracts.h"
 
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -21,6 +22,8 @@ public:
   std::optional<std::vector<std::uint8_t>> read_param_symbol(const std::string& name, std::uint64_t size) const;
 
 private:
+  mutable std::mutex mu_;
+
   struct Allocation final {
     std::uint64_t base = 0;
     std::uint64_t size = 0;

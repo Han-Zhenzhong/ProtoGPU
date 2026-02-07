@@ -16,6 +16,11 @@ namespace gpusim {
 struct SimConfig final {
   std::uint32_t warp_size = 32;
   std::uint64_t max_steps = 100000;
+
+  // Multi-SM parallel execution (06.02)
+  std::uint32_t sm_count = 1;
+  bool parallel = false;
+  bool deterministic = false;
 };
 
 struct SimResult final {

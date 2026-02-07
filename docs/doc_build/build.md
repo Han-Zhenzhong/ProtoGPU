@@ -103,6 +103,30 @@ cmake --build build -j
 
 ---
 
+## 多 SM 并行执行（06.02）
+
+本项目支持“每个 SM 一个宿主线程”的并行执行基线（见用户文档 [docs/doc_user/sm_parallel_execution.md](../doc_user/sm_parallel_execution.md)）。
+
+启用方式：在 config 的 `sim` 节点中设置：
+- `sim.sm_count`：SM worker 数（>1 才有意义）
+- `sim.parallel`：是否启用并行 worker
+- `sim.deterministic`：确定性回归模式（当前基线：为 true 时会禁用并行）
+
+仓库内提供了一个并行示例配置：
+- `assets/configs/demo_parallel_config.json`
+
+运行示例（从仓库根目录）：
+
+```bash
+./build/gpu-sim-cli \
+  --config assets/configs/demo_parallel_config.json \
+  --workload assets/workloads/smoke_single_stream.json \
+  --trace out/parallel.trace.jsonl \
+  --stats out/parallel.stats.json
+```
+
+---
+
 ## 3D Kernel Launch（grid/block）
 
 `gpu-sim-cli` 支持以 3D `grid_dim` / `block_dim` 形式启动 kernel（对齐 `doc_design/modules/06.01_launch_grid_block_3d.md` 的抽象语义）。
