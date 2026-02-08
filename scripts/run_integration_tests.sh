@@ -56,6 +56,7 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 PTX="assets/ptx/demo_kernel.ptx"
+PTX_DIVERGE="assets/ptx/demo_divergence.ptx"
 PTX_ISA="assets/ptx_isa/demo_ptx64.json"
 INST_DESC="assets/inst_desc/demo_desc.json"
 CONFIG_JSON="assets/configs/demo_config.json"
@@ -111,6 +112,41 @@ if ! grep -Fq "memory_model" "$OUT_DIR/trace.jsonl"; then
   echo "error: expected memory_model to be observable in RUN_START extra" >&2
   echo "--- tail ($OUT_DIR/trace.jsonl) ---" >&2
   tail -n 50 "$OUT_DIR/trace.jsonl" >&2 || true
+  exit 1
+fi
+
+echo "[integration] divergence smoke: demo_divergence.ptx (expect SIMT_SPLIT)"
+set +e
+"$CLI" \
+  --ptx "$PTX_DIVERGE" \
+  --ptx-isa "$PTX_ISA" \
+  --inst-desc "$INST_DESC" \
+  --config "$CONFIG_JSON" \
+  --block 2,1,1 \
+  --trace "$OUT_DIR/trace_diverge.jsonl" \
+  --stats "$OUT_DIR/stats_diverge.json" \
+  >"$OUT_DIR/stdout_diverge.txt" 2>"$OUT_DIR/stderr_diverge.txt"
+RC=$?
+set -e
+
+if [[ $RC -ne 0 ]]; then
+  echo "error: divergence smoke run failed (exit=$RC)" >&2
+  echo "--- stdout ($OUT_DIR/stdout_diverge.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stdout_diverge.txt" >&2 || true
+  echo "--- stderr ($OUT_DIR/stderr_diverge.txt) ---" >&2
+  tail -n 200 "$OUT_DIR/stderr_diverge.txt" >&2 || true
+  exit $RC
+fi
+
+if [[ ! -s "$OUT_DIR/trace_diverge.jsonl" ]]; then
+  echo "error: missing/empty trace: $OUT_DIR/trace_diverge.jsonl" >&2
+  exit 1
+fi
+
+if ! grep -Fq '"action":"SIMT_SPLIT"' "$OUT_DIR/trace_diverge.jsonl"; then
+  echo "error: expected SIMT_SPLIT in divergence trace" >&2
+  echo "--- tail ($OUT_DIR/trace_diverge.jsonl) ---" >&2
+  tail -n 100 "$OUT_DIR/trace_diverge.jsonl" >&2 || true
   exit 1
 fi
 

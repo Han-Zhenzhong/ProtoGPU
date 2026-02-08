@@ -4,6 +4,8 @@
 #include "gpusim/scheduler.h"
 #include "gpusim/simt_scheduler.h"
 
+#include "control_flow_analysis.h"
+
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -70,6 +72,27 @@ static LaneMask lane_mask_prefix(std::uint32_t warp_size, std::uint32_t lanes_on
   m.bits_lo = (1u << lanes_on) - 1u;
   return m;
 }
+
+static LaneMask lane_mask_or_same_width(const LaneMask& a, const LaneMask& b) {
+  LaneMask m;
+  m.width = a.width;
+  m.bits_lo = a.bits_lo | b.bits_lo;
+  return m;
+}
+
+static LaneMask lane_mask_not_width(const LaneMask& m) {
+  LaneMask r;
+  r.width = m.width;
+  if (m.width >= 32) {
+    r.bits_lo = ~m.bits_lo;
+    return r;
+  }
+  const std::uint32_t mask = (m.width == 0) ? 0u : ((1u << m.width) - 1u);
+  r.bits_lo = (~m.bits_lo) & mask;
+  return r;
+}
+
+static bool lane_mask_empty(const LaneMask& m) { return m.bits_lo == 0u; }
 
 SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launch) {
   SimResult res;
@@ -207,10 +230,117 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       const std::uint32_t lanes_on = static_cast<std::uint32_t>(remaining >= warp_size ? warp_size : remaining);
       warp.active = lane_mask_prefix(warp_size, lanes_on);
 
+      warp.exited.width = warp_size;
+      warp.exited.bits_lo = 0u;
+      warp.simt_stack.clear();
+      {
+        SimtFrame f;
+        f.pc = 0;
+        f.active = warp.active;
+        f.reconv_pc = static_cast<PC>(kernel.insts.size());
+        f.is_join = false;
+        warp.simt_stack.push_back(f);
+      }
+
       warp.r_u32.assign(static_cast<std::size_t>(kernel.reg_u32_count) * warp_size, 0);
       warp.r_u64.assign(static_cast<std::size_t>(kernel.reg_u64_count) * warp_size, 0);
       warp.p.assign(static_cast<std::size_t>(8) * warp_size, 1);
     }
+
+    // Precompute reconvergence PC for predicated BRA instructions.
+    const auto cfa = analyze_control_flow(kernel, registry_, expander_, warp_size);
+    if (cfa.diag) {
+      if (diag_mu && diag_out) {
+        std::lock_guard<std::mutex> lock(*diag_mu);
+        *diag_out = *cfa.diag;
+      } else {
+        res.diag = *cfa.diag;
+      }
+      if (scheduler) scheduler->request_stop();
+      return;
+    }
+
+    const auto emit_simt_ctrl = [&](const std::uint64_t ts_local,
+                                   const std::string& action,
+                                   const CTAId cta_id,
+                                   const WarpId warp_id,
+                                   const PC pc,
+                                   const LaneMask mask,
+                                   gpusim::json::Object extra) {
+      obs_.emit(Event{ ts_local, EventCategory::Ctrl, action,
+                      std::nullopt, cta_id, warp_id, std::nullopt, sm_id, std::nullopt, std::nullopt, std::nullopt,
+                      pc, mask, std::nullopt, std::nullopt, std::nullopt, gpusim::json::stringify(gpusim::json::Value(std::move(extra))) });
+    };
+
+    const auto normalize_stack = [&](WarpState& warp, const CTAId cta_id, const WarpId warp_id) -> bool {
+      while (true) {
+        if (warp.simt_stack.empty()) {
+          warp.done = true;
+          warp.active.width = warp_size;
+          warp.active.bits_lo = 0u;
+          return false;
+        }
+
+        auto& top = warp.simt_stack.back();
+        top.active = lane_mask_and(top.active, lane_mask_not_width(warp.exited));
+
+        if (lane_mask_empty(top.active)) {
+          gpusim::json::Object extra;
+          extra.emplace("reason", gpusim::json::Value("empty_active"));
+          extra.emplace("stack_depth_after", gpusim::json::Value(static_cast<double>(warp.simt_stack.size() - 1)));
+          emit_simt_ctrl(next_ts_local(), "SIMT_POP", cta_id, warp_id, top.pc, top.active, std::move(extra));
+          warp.simt_stack.pop_back();
+          continue;
+        }
+
+        if (top.is_join) {
+          // Join frame becomes an executable path only after all child paths are popped.
+          top.is_join = false;
+          warp.pc = top.pc;
+          warp.active = top.active;
+          return true;
+        }
+
+        if (top.pc == top.reconv_pc) {
+          const PC reconv_pc = top.pc;
+          const LaneMask arrived = top.active;
+          warp.simt_stack.pop_back();
+
+          // Find nearest join frame for this reconv_pc.
+          bool found_join = false;
+          for (auto it = warp.simt_stack.rbegin(); it != warp.simt_stack.rend(); ++it) {
+            if (it->is_join && it->pc == reconv_pc) {
+              it->active = lane_mask_or_same_width(it->active, arrived);
+              found_join = true;
+
+              gpusim::json::Object extra;
+              extra.emplace("reconv_pc", gpusim::json::Value(static_cast<double>(reconv_pc)));
+              extra.emplace("arrived", gpusim::json::Value(lane_mask_to_hex(arrived)));
+              extra.emplace("join_active", gpusim::json::Value(lane_mask_to_hex(it->active)));
+              extra.emplace("stack_depth_after", gpusim::json::Value(static_cast<double>(warp.simt_stack.size())));
+              emit_simt_ctrl(next_ts_local(), "SIMT_MERGE", cta_id, warp_id, reconv_pc, it->active, std::move(extra));
+              break;
+            }
+          }
+          if (!found_join) {
+            const auto d = Diagnostic{ "simt", "E_RECONV_INVALID", "reconv join frame not found", std::nullopt, kernel.name, reconv_pc };
+            if (diag_mu && diag_out) {
+              std::lock_guard<std::mutex> lock(*diag_mu);
+              *diag_out = d;
+            } else {
+              res.diag = d;
+            }
+            if (scheduler) scheduler->request_stop();
+            return false;
+          }
+          continue;
+        }
+
+        warp.pc = top.pc;
+        warp.active = top.active;
+        return true;
+      }
+    };
 
     auto local_warp_sched = create_warp_scheduler(cfg_.warp_scheduler);
     if (!local_warp_sched) local_warp_sched = create_warp_scheduler("in_order_run_to_completion");
@@ -228,6 +358,8 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       if (warp.done) continue;
 
       const WarpId warp_id = static_cast<WarpId>((item.cta_linear << 32) | static_cast<std::uint64_t>(warp.warpid));
+
+      if (!normalize_stack(warp, item.cta_id, warp_id)) return;
 
       if (warp.pc < 0 || static_cast<std::size_t>(warp.pc) >= kernel.insts.size()) {
         const auto d = Diagnostic{ "simt", "E_PC_OOB", "PC out of range", std::nullopt, kernel.name, warp.pc };
@@ -305,6 +437,16 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       }
 
       std::optional<PC> next_pc;
+      struct PendingSplit final {
+        bool active = false;
+        PC target_pc = 0;
+        PC reconv_pc = 0;
+        LaneMask taken;
+        LaneMask fallthrough;
+        PC pc = 0;
+      } split;
+
+      bool any_ret_masked = false;
       for (const auto& uop : uops) {
         auto uop_name = [&]() -> std::string {
           switch (uop.op) {
@@ -332,21 +474,54 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
         if (uop.kind == MicroOpKind::Exec) {
           sr = exec_.step(uop, warp, obs_);
         } else if (uop.kind == MicroOpKind::Control) {
-          if (uop.op == MicroOpOp::Bra || uop.op == MicroOpOp::Ret) {
-            const auto m = lane_mask_and(warp.active, uop.guard);
-            if (m.bits_lo != 0u && m.bits_lo != warp.active.bits_lo) {
-              const auto d = Diagnostic{ "simt", "E_DIVERGENCE_UNSUPPORTED", "divergent control-flow is unsupported in this milestone", inst.dbg, kernel.name, warp.pc };
-              if (diag_mu && diag_out) {
-                std::lock_guard<std::mutex> lock(*diag_mu);
-                *diag_out = d;
-              } else {
-                res.diag = d;
+          if (uop.op == MicroOpOp::Ret) {
+            const auto exec_mask = lane_mask_and(warp.active, uop.guard);
+            if (exec_mask.bits_lo != 0u) {
+              warp.exited = lane_mask_or_same_width(warp.exited, exec_mask);
+              // Update active lanes for the current path frame (top of stack).
+              if (!warp.simt_stack.empty()) {
+                warp.simt_stack.back().active = lane_mask_and(warp.simt_stack.back().active, lane_mask_not_width(exec_mask));
+                warp.active = warp.simt_stack.back().active;
               }
-              if (scheduler) scheduler->request_stop();
-              return;
+              any_ret_masked = true;
+            }
+            obs_.counter("uop.ctrl.ret");
+            sr.progressed = true;
+          } else {
+            sr = ctrl_.step(uop, warp, obs_);
+            if (uop.op == MicroOpOp::Bra && sr.next_pc.has_value()) {
+              const auto taken = lane_mask_and(warp.active, uop.guard);
+              const auto fallthrough = lane_mask_and(warp.active, lane_mask_not_width(uop.guard));
+              if (!lane_mask_empty(taken) && !lane_mask_empty(fallthrough)) {
+                const PC pc_here = warp.pc;
+                if (pc_here < 0 || static_cast<std::size_t>(pc_here) >= cfa.reconv_pc.size() || !cfa.reconv_pc[static_cast<std::size_t>(pc_here)].has_value()) {
+                  const auto d = Diagnostic{ "simt", "E_RECONV_MISS", "missing reconv_pc for divergent BRA", inst.dbg, kernel.name, pc_here };
+                  if (diag_mu && diag_out) {
+                    std::lock_guard<std::mutex> lock(*diag_mu);
+                    *diag_out = d;
+                  } else {
+                    res.diag = d;
+                  }
+                  if (scheduler) scheduler->request_stop();
+                  return;
+                }
+                split.active = true;
+                split.pc = pc_here;
+                split.target_pc = *sr.next_pc;
+                split.reconv_pc = *cfa.reconv_pc[static_cast<std::size_t>(pc_here)];
+                split.taken = taken;
+                split.fallthrough = fallthrough;
+
+                gpusim::json::Object extra;
+                extra.emplace("target_pc", gpusim::json::Value(static_cast<double>(split.target_pc)));
+                extra.emplace("reconv_pc", gpusim::json::Value(static_cast<double>(split.reconv_pc)));
+                extra.emplace("mask_active", gpusim::json::Value(lane_mask_to_hex(warp.active)));
+                extra.emplace("mask_taken", gpusim::json::Value(lane_mask_to_hex(taken)));
+                extra.emplace("mask_fallthrough", gpusim::json::Value(lane_mask_to_hex(fallthrough)));
+                emit_simt_ctrl(next_ts_local(), "SIMT_SPLIT", item.cta_id, warp_id, pc_here, warp.active, std::move(extra));
+              }
             }
           }
-          sr = ctrl_.step(uop, warp, obs_);
         } else {
           sr = mem_unit_.step(uop, warp, obs_);
         }
@@ -385,8 +560,54 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
 
       if (!warp.done) {
         const auto old_pc = warp.pc;
-        if (next_pc.has_value()) warp.pc = *next_pc;
-        else warp.pc = old_pc + 1;
+
+        if (!warp.simt_stack.empty()) {
+          auto& top = warp.simt_stack.back();
+
+          if (split.active) {
+            // Replace current path frame with a join + two child paths.
+            const PC outer_reconv = top.reconv_pc;
+            warp.simt_stack.pop_back();
+
+            SimtFrame join;
+            join.pc = split.reconv_pc;
+            join.active.width = warp_size;
+            join.active.bits_lo = 0u;
+            join.reconv_pc = outer_reconv;
+            join.is_join = true;
+
+            SimtFrame fall;
+            fall.pc = old_pc + 1;
+            fall.active = split.fallthrough;
+            fall.reconv_pc = split.reconv_pc;
+            fall.is_join = false;
+
+            SimtFrame taken;
+            taken.pc = split.target_pc;
+            taken.active = split.taken;
+            taken.reconv_pc = split.reconv_pc;
+            taken.is_join = false;
+
+            warp.simt_stack.push_back(join);
+            warp.simt_stack.push_back(fall);
+            warp.simt_stack.push_back(taken);
+          } else {
+            if (next_pc.has_value()) {
+              top.pc = *next_pc;
+            } else {
+              top.pc = old_pc + 1;
+            }
+          }
+        }
+
+        // Refresh warp.pc/active from stack top.
+        if (!warp.simt_stack.empty()) {
+          warp.pc = warp.simt_stack.back().pc;
+          warp.active = warp.simt_stack.back().active;
+        } else {
+          warp.done = true;
+        }
+
         obs_.emit(Event{ next_ts_local(), EventCategory::Commit, "COMMIT",
                         std::nullopt, item.cta_id, warp_id, std::nullopt, sm_id, std::nullopt, std::nullopt, std::nullopt,
                         old_pc, warp.active, inst.opcode, std::nullopt, std::nullopt, std::nullopt });

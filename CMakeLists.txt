@@ -19,6 +19,7 @@ add_library(gpusim_core
   src/units/exec_core.cpp
   src/units/control_unit.cpp
   src/units/mem_unit.cpp
+  src/simt/control_flow_analysis.cpp
   src/simt/simt.cpp
   src/runtime/deps.cpp
   src/runtime/cta_scheduler.cpp

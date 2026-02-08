@@ -1,0 +1,25 @@
+.version 6.4
+.target sm_70
+.address_size 64
+
+.visible .entry demo_divergence()
+{
+    .reg .u32 %r<2>;
+    .reg .pred %p<2>;
+
+    // p0 = (laneid < 1)
+    mov.u32 %r0, %laneid;
+    mov.u32 %r1, 1;
+    setp.lt.s32 %p0, %r0, %r1;
+
+    // Divergent branch: lane0 taken, others fall through.
+    @%p0 bra L_taken;
+
+    // Fallthrough-only path.
+    mov.u32 %r0, 1;
+
+L_taken:
+    // Reconvergence point.
+    mov.u32 %r0, 2;
+    ret;
+}

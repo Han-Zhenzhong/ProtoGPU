@@ -57,6 +57,7 @@ if exist "%OUT_DIR%" rmdir /s /q "%OUT_DIR%"
 mkdir "%OUT_DIR%" >nul
 
 set PTX=assets\ptx\demo_kernel.ptx
+set PTX_DIVERGE=assets\ptx\demo_divergence.ptx
 set PTX_ISA=assets\ptx_isa\demo_ptx64.json
 set INST_DESC=assets\inst_desc\demo_desc.json
 set CONFIG_JSON=assets\configs\demo_config.json
@@ -100,6 +101,27 @@ if errorlevel 1 (
 findstr /c:"memory_model" "%OUT_DIR%\trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected memory_model to be observable in RUN_START extra
+  popd >nul
+  exit /b 1
+)
+
+echo [integration] divergence smoke: demo_divergence.ptx (expect SIMT_SPLIT)
+"%CLI%" --ptx "%PTX_DIVERGE%" --ptx-isa "%PTX_ISA%" --inst-desc "%INST_DESC%" --config "%CONFIG_JSON%" --block 2,1,1 --trace "%OUT_DIR%\trace_diverge.jsonl" --stats "%OUT_DIR%\stats_diverge.json" 1>"%OUT_DIR%\stdout_diverge.txt" 2>"%OUT_DIR%\stderr_diverge.txt"
+if errorlevel 1 (
+  echo error: divergence smoke run failed (exit=%errorlevel%)
+  echo --- stdout (%OUT_DIR%\stdout_diverge.txt) ---
+  type "%OUT_DIR%\stdout_diverge.txt"
+  echo --- stderr (%OUT_DIR%\stderr_diverge.txt) ---
+  type "%OUT_DIR%\stderr_diverge.txt"
+  popd >nul
+  exit /b %errorlevel%
+)
+
+findstr /c:"\"action\":\"SIMT_SPLIT\"" "%OUT_DIR%\trace_diverge.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected SIMT_SPLIT in divergence trace
+  echo --- tail (%OUT_DIR%\trace_diverge.jsonl) ---
+  powershell -NoProfile -Command "Get-Content '%OUT_DIR%\trace_diverge.jsonl' -Tail 100" 2>nul
   popd >nul
   exit /b 1
 )

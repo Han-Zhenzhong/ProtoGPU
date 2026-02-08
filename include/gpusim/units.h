@@ -10,6 +10,13 @@
 
 namespace gpusim {
 
+struct SimtFrame final {
+  PC pc = 0;
+  LaneMask active;
+  PC reconv_pc = 0;
+  bool is_join = false;
+};
+
 struct WarpState final {
   // Launch / context metadata
   LaunchConfig launch;
@@ -20,6 +27,9 @@ struct WarpState final {
   PC pc = 0;
   bool done = false;
   LaneMask active;
+
+  LaneMask exited;
+  std::vector<SimtFrame> simt_stack;
 
   // Lane-wise storage in reg-major layout: [reg][lane]
   std::vector<std::uint32_t> r_u32;

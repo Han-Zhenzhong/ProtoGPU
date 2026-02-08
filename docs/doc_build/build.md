@@ -242,6 +242,26 @@ CLI 参数
 ./build/gpu-sim-cli --ptx assets/ptx/demo_kernel.ptx --grid 2,1,1 --block 32,1,1
 ```
 
+## SIMT 分歧演示（M5）
+
+仓库提供了一个最小的 divergent `bra` 示例 PTX：`assets/ptx/demo_divergence.ptx`。
+
+运行示例
+
+```bash
+./build/gpu-sim-cli \
+  --ptx assets/ptx/demo_divergence.ptx \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
+  --inst-desc assets/inst_desc/demo_desc.json \
+  --config assets/configs/demo_config.json \
+  --block 2,1,1 \
+  --trace out/diverge.trace.jsonl \
+  --stats out/diverge.stats.json
+```
+
+验证方式
+- 在 trace 中搜索 `SIMT_SPLIT`（表示发生了 warp 内分歧拆分）。
+
 说明
 - 当前 demo PTX 是否“实际使用 builtin（例如 `%tid.x`）”取决于你传入的 PTX 文件与 ISA/inst_desc 资产；launch 维度会贯穿 SIMT 侧上下文（CTA/warp/lane）。
 - `block_dim.x * block_dim.y * block_dim.z` 不是 warp_size 的整数倍时，最后一个 warp 会是部分 warp（`active_mask` 会关闭无效 lanes）。

@@ -58,6 +58,11 @@ trace（`--trace`）
 - 之后为事件流（当前 Tier‑0 最小集会包含：`RUN_START`/`FETCH`/`UOP`/`COMMIT`）。
 - 兼容性说明：`RUN_START.extra` 仍是一个 *stringified JSON*（双层 JSON）字段；脚本依赖的动作名（如 `RUN_START`）保持不变。
 
+SIMT 分歧/合流（M5）额外事件（`EventCategory::Ctrl`）
+- `SIMT_SPLIT`：遇到 divergent `bra`，拆分 taken/fallthrough 两条路径
+- `SIMT_MERGE`：某条路径到达 reconv 点，将 mask 合并到 join frame
+- `SIMT_POP`：弹出空路径帧（例如 active 为空）
+
 stats（`--stats`）
 - 输出为一个 JSON 对象。
 - 顶层字段：`format_version/schema/profile/deterministic/counters`（只做 additive，不删除已有字段）。
@@ -82,7 +87,8 @@ stats（`--stats`）
 - `instruction:DESC_AMBIGUOUS`：同一条 PTX 指令被多条 ISA entry 同时匹配（需要让 `operand_kinds/type_mod` 更精确）
 - `frontend:OPERAND_PARSE_FAIL`：操作数 token 无法按 `operand_kinds` 解析（如寄存器/地址/立即数格式不符合）
 - `simt:E_DESC_MISS`：`--inst-desc` 缺少某条 IR 指令（`ir_op.type_mod(operand_kinds...)`）的语义
-- `simt:E_DIVERGENCE_UNSUPPORTED`：出现分歧控制流（当前里程碑不支持）
+- `simt:E_RECONV_MISS`：分歧 `bra` 缺少 reconv 点（CFG/ipdom 分析失败或不支持的控制流形态）
+- `simt:E_RECONV_INVALID`：reconv 点/CFG 非法（例如 branch target 越界、join frame 异常）
 - `simt:E_MEMORY_MODEL`：配置选择了未知 memory model（且 `allow_unknown_selectors=false`）
 
 ## WorkloadSpec（--workload：streams/commands）

@@ -23,6 +23,7 @@
 - 01_ptx64_frontend_and_mapping.md：PTX tokenization 子集、PTX→IR 映射匹配键、operand 解析与 label→pc 改写落点
 - 02_instruction_semantics_and_uops.md：inst_desc（IR→uops）契约：descriptor lookup/expand、predication guard、fail-fast 落点
 - 03_simt_predication_and_controlflow.md：SIMT 编排层：predication→guard、uniform-only 分支、next_pc 提交与诊断分流
+- 04.01_simt_divergence_and_reconvergence.md：SIMT 线程分歧与合流（M5）：CFG+ipdom 的 reconv 预计算、SIMT stack、lane-wise ret 与测试建议
 - 04_memory_no_cache_addrspace.md：no_cache_addrspace：selector 校验、param/global 访问路径、对齐/越界/同址冲突与确定性
 - 05_observability_and_output_contract.md：Diagnostic/trace/stats 的对外输出：现状字段、写出位置、版本化差距与扩展入口
 - 06_public_api_and_assets_packaging.md：对外 API（Runtime/CLI/workload）与资产加载（file vs in-memory）的现状与扩展点

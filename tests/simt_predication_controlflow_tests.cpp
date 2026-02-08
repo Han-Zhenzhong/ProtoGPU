@@ -48,6 +48,7 @@ gpusim::DescriptorRegistry make_registry_for_tests() {
   // - bra  (imm)             -> CTRL BRA  in=[0]
   // - bra2 (imm,imm)         -> CTRL BRA  in=[0] and CTRL BRA in=[1] (conflict)
   // - mov  (reg,imm)         -> EXEC MOV  in=[1] out=[0]
+  // - ret  ()                -> CTRL RET  in=[]
   const std::string desc_json = R"JSON(
   {
     "insts": [
@@ -82,6 +83,14 @@ gpusim::DescriptorRegistry make_registry_for_tests() {
         "operand_kinds": ["reg", "imm"],
         "uops": [
           { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+        ]
+      },
+      {
+        "opcode": "ret",
+        "type_mod": "",
+        "operand_kinds": [],
+        "uops": [
+          { "kind": "CTRL", "op": "RET", "in": [], "out": [] }
         ]
       }
     ]
@@ -151,18 +160,21 @@ void test_pred_oob_is_simt_error() {
   }
 }
 
-void test_uniform_only_divergence_is_fail_fast() {
+void test_divergence_reconverges_and_completes() {
   using namespace gpusim;
 
   auto registry = make_registry_for_tests();
-  ObsControl obs(ObsConfig{ false, 0 });
+  ObsControl obs(ObsConfig{ true, 4096 });
   AddrSpaceManager mem;
 
   SimConfig cfg;
   cfg.warp_size = 2;
 
   // 0: setp p0, %laneid, 1  (lt) => lane0=true, lane1=false
-  // 1: @p0 bra 0            => only lane0 enabled => divergence => E_DIVERGENCE_UNSUPPORTED
+  // 1: @p0 bra 3            => lane0 jumps to 3, lane1 falls through to 2
+  // 2: mov r0, 1            => executed only by lane1
+  // 3: mov r0, 2            => reconvergence point (both lanes execute)
+  // 4: ret
   InstRecord setp_inst;
   setp_inst.opcode = "setp";
   setp_inst.mods.type_mod = "u32";
@@ -171,9 +183,22 @@ void test_uniform_only_divergence_is_fail_fast() {
   InstRecord bra_inst;
   bra_inst.opcode = "bra";
   bra_inst.pred = PredGuard{ 0, false };
-  bra_inst.operands = { imm(0) };
+  bra_inst.operands = { imm(3) };
 
-  auto kernel = make_kernel("k_div", /*reg_u32=*/0, { setp_inst, bra_inst });
+  InstRecord mov1;
+  mov1.opcode = "mov";
+  mov1.mods.type_mod = "u32";
+  mov1.operands = { reg_u32(0), imm(1) };
+
+  InstRecord mov2;
+  mov2.opcode = "mov";
+  mov2.mods.type_mod = "u32";
+  mov2.operands = { reg_u32(0), imm(2) };
+
+  InstRecord ret;
+  ret.opcode = "ret";
+
+  auto kernel = make_kernel("k_div", /*reg_u32=*/1, { setp_inst, bra_inst, mov1, mov2, ret });
 
   LaunchConfig launch;
   launch.grid_dim = Dim3{ 1, 1, 1 };
@@ -182,12 +207,18 @@ void test_uniform_only_divergence_is_fail_fast() {
 
   SimtExecutor sim(cfg, std::move(registry), obs, mem);
   auto out = sim.run(kernel, launch);
-  EXPECT_TRUE(!out.completed);
-  EXPECT_TRUE(out.diag.has_value());
-  if (out.diag) {
-    EXPECT_EQ(out.diag->module, std::string("simt"));
-    EXPECT_EQ(out.diag->code, std::string("E_DIVERGENCE_UNSUPPORTED"));
+
+  EXPECT_TRUE(out.completed);
+  EXPECT_TRUE(!out.diag.has_value());
+
+  bool saw_split = false;
+  for (const auto& e : obs.trace_snapshot()) {
+    if (e.category == EventCategory::Ctrl && e.action == "SIMT_SPLIT") {
+      saw_split = true;
+      break;
+    }
   }
+  EXPECT_TRUE(saw_split);
 }
 
 void test_next_pc_conflict_is_fail_fast() {
@@ -248,7 +279,7 @@ void test_pc_oob_is_fail_fast() {
 
 int main() {
   test_pred_oob_is_simt_error();
-  test_uniform_only_divergence_is_fail_fast();
+  test_divergence_reconverges_and_completes();
   test_next_pc_conflict_is_fail_fast();
   test_pc_oob_is_fail_fast();
 
