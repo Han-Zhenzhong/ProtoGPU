@@ -6,7 +6,9 @@
 - 本地 build/run/test/format 的辅助脚本（Windows 友好）。
 
 说明
-- 第一版交付后再在 docs/doc_build/ 中补齐构建文档；脚本可先按需要逐步增加。
+- 构建方式与环境要求见构建文档：
+	- [docs/doc_build/build.md](../docs/doc_build/build.md)
+- `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
 
 ## 测试脚本
 
@@ -45,4 +47,16 @@ bash scripts/run_integration_tests.sh build
 
 ```bash
 CONFIG=Release bash scripts/run_integration_tests.sh build
+
+```
+
+## Tier-0（merge gate）
+
+Tier-0 的唯一 merge gate CTest 名称为：
+- `gpu-sim-tiny-gpt2-mincov-tests`
+
+如果你希望只跑 Tier-0：
+
+```bash
+ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 ```

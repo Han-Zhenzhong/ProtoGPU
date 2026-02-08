@@ -28,7 +28,7 @@ fi
 
 if command -v ctest >/dev/null 2>&1; then
   echo "[unit] running via ctest (unit-only; build dir: $BUILD_DIR, config: $CONFIG)"
-  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
+  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-(tests|inst-desc-tests|simt-tests|memory-tests|observability-contract-tests|public-api-tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
   exit 0
 fi
 
@@ -36,6 +36,11 @@ echo "[unit] ctest not found; running unit test executables directly" >&2
 
 TESTS=(
   "gpu-sim-tests"
+  "gpu-sim-inst-desc-tests"
+  "gpu-sim-simt-tests"
+  "gpu-sim-memory-tests"
+  "gpu-sim-observability-contract-tests"
+  "gpu-sim-public-api-tests"
   "gpu-sim-builtins-tests"
   "gpu-sim-config-parse-tests"
   "gpu-sim-tiny-gpt2-mincov-tests"

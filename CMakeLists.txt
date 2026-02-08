@@ -50,6 +50,36 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
 
+  add_executable(gpu-sim-inst-desc-tests
+    tests/inst_desc_registry_tests.cpp
+  )
+  target_link_libraries(gpu-sim-inst-desc-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-inst-desc-tests COMMAND gpu-sim-inst-desc-tests)
+
+  add_executable(gpu-sim-simt-tests
+    tests/simt_predication_controlflow_tests.cpp
+  )
+  target_link_libraries(gpu-sim-simt-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-simt-tests COMMAND gpu-sim-simt-tests)
+
+  add_executable(gpu-sim-memory-tests
+    tests/memory_no_cache_addrspace_tests.cpp
+  )
+  target_link_libraries(gpu-sim-memory-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-memory-tests COMMAND gpu-sim-memory-tests)
+
+  add_executable(gpu-sim-observability-contract-tests
+    tests/observability_output_contract_tests.cpp
+  )
+  target_link_libraries(gpu-sim-observability-contract-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-observability-contract-tests COMMAND gpu-sim-observability-contract-tests)
+
+  add_executable(gpu-sim-public-api-tests
+    tests/public_api_in_memory_tests.cpp
+  )
+  target_link_libraries(gpu-sim-public-api-tests PRIVATE gpusim_core)
+  add_test(NAME gpu-sim-public-api-tests COMMAND gpu-sim-public-api-tests)
+
   add_executable(gpu-sim-builtins-tests
     tests/builtins_tests.cpp
   )

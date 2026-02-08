@@ -1,0 +1,18 @@
+.version 6.4
+.target sm_70
+.address_size 64
+
+.visible .entry mem_unalloc_ld_global_f32(
+    .param .u64 in_ptr
+)
+{
+    .reg .u64 %rd<2>;
+    .reg .f32 %f<1>;
+
+    ld.param.u64 %rd1, [in_ptr];
+
+    // Attempt an aligned load from an unallocated address. Must fail-fast.
+    ld.global.f32 %f0, [%rd1];
+
+    ret;
+}

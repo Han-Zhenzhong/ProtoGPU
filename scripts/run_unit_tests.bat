@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%\.." >nul
+
 set BUILD_DIR=%~1
 if "%BUILD_DIR%"=="" set BUILD_DIR=build
 
@@ -8,15 +11,28 @@ if "%CONFIG%"=="" (
   set CONFIG=Release
 )
 
-if not exist "%BUILD_DIR%" (
-  echo error: build dir not found: %BUILD_DIR%
-  exit /b 2
+set NEED_BUILD=0
+if not exist "%BUILD_DIR%" set NEED_BUILD=1
+
+if %NEED_BUILD%==0 (
+  if not exist "%BUILD_DIR%\gpu-sim-tiny-gpt2-mincov-tests.exe" if not exist "%BUILD_DIR%\%CONFIG%\gpu-sim-tiny-gpt2-mincov-tests.exe" set NEED_BUILD=1
+)
+
+if %NEED_BUILD%==1 (
+  echo [unit] build artifacts missing; building first
+  set BUILD_TESTING=ON
+  call "%SCRIPT_DIR%\build.bat" "%BUILD_DIR%" "%CONFIG%"
+  if errorlevel 1 (
+    popd >nul
+    exit /b %errorlevel%
+  )
 )
 
 where ctest >nul 2>nul
 if %errorlevel%==0 (
   echo [unit] running via ctest (unit-only; build dir: %BUILD_DIR%, config: %CONFIG%)
-  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-(tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
+  ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-(tests|inst-desc-tests|simt-tests|memory-tests|observability-contract-tests|public-api-tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
+  popd >nul
   exit /b %errorlevel%
 )
 
@@ -25,6 +41,11 @@ set RAN_ANY=0
 
 for %%N in (
   gpu-sim-tests
+  gpu-sim-inst-desc-tests
+  gpu-sim-simt-tests
+  gpu-sim-memory-tests
+  gpu-sim-observability-contract-tests
+  gpu-sim-public-api-tests
   gpu-sim-builtins-tests
   gpu-sim-config-parse-tests
   gpu-sim-tiny-gpt2-mincov-tests
@@ -51,7 +72,9 @@ for %%N in (
 :done
 if %RAN_ANY%==0 (
   echo error: cannot find unit test executables under %BUILD_DIR% (config=%CONFIG%)
+  popd >nul
   exit /b 2
 )
 
+popd >nul
 exit /b %FAIL%

@@ -88,6 +88,13 @@ if [[ ! -s "$OUT_DIR/trace.jsonl" ]]; then
   echo "error: missing/empty trace: $OUT_DIR/trace.jsonl" >&2
   exit 1
 fi
+
+if ! grep -Fq '"action":"TRACE_HEADER"' "$OUT_DIR/trace.jsonl"; then
+  echo "error: expected TRACE_HEADER as trace JSONL metadata" >&2
+  echo "--- head ($OUT_DIR/trace.jsonl) ---" >&2
+  head -n 5 "$OUT_DIR/trace.jsonl" >&2 || true
+  exit 1
+fi
 if [[ ! -s "$OUT_DIR/stats.json" ]]; then
   echo "error: missing/empty stats: $OUT_DIR/stats.json" >&2
   exit 1
@@ -95,6 +102,13 @@ fi
 
 if ! grep -Fq '"action":"RUN_START"' "$OUT_DIR/trace.jsonl"; then
   echo "error: expected RUN_START in trace (config_summary missing?)" >&2
+  echo "--- tail ($OUT_DIR/trace.jsonl) ---" >&2
+  tail -n 50 "$OUT_DIR/trace.jsonl" >&2 || true
+  exit 1
+fi
+
+if ! grep -Fq "memory_model" "$OUT_DIR/trace.jsonl"; then
+  echo "error: expected memory_model to be observable in RUN_START extra" >&2
   echo "--- tail ($OUT_DIR/trace.jsonl) ---" >&2
   tail -n 50 "$OUT_DIR/trace.jsonl" >&2 || true
   exit 1

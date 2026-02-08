@@ -367,11 +367,16 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
         }
 
         if (sr.diag) {
+          auto d = *sr.diag;
+          if (!d.function) d.function = kernel.name;
+          if (!d.inst_index) d.inst_index = warp.pc;
+          if (!d.location && inst.dbg) d.location = inst.dbg;
+
           if (diag_mu && diag_out) {
             std::lock_guard<std::mutex> lock(*diag_mu);
-            *diag_out = sr.diag;
+            *diag_out = d;
           } else {
-            res.diag = sr.diag;
+            res.diag = d;
           }
           if (scheduler) scheduler->request_stop();
           return;

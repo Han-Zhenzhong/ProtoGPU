@@ -1,0 +1,261 @@
+#include "gpusim/contracts.h"
+#include "gpusim/frontend.h"
+#include "gpusim/instruction_desc.h"
+#include "gpusim/memory.h"
+#include "gpusim/observability.h"
+#include "gpusim/simt.h"
+
+#include <iostream>
+#include <string>
+
+namespace {
+
+int g_failures = 0;
+
+void fail(const std::string& msg, const char* file, int line) {
+  g_failures++;
+  std::cerr << file << ":" << line << ": " << msg << "\n";
+}
+
+#define EXPECT_TRUE(cond) \
+  do { \
+    if (!(cond)) fail(std::string("EXPECT_TRUE failed: ") + #cond, __FILE__, __LINE__); \
+  } while (0)
+
+#define EXPECT_EQ(a, b) \
+  do { \
+    const auto& _a = (a); \
+    const auto& _b = (b); \
+    if (!(_a == _b)) { \
+      fail(std::string("EXPECT_EQ failed: ") + #a + " != " + #b, __FILE__, __LINE__); \
+    } \
+  } while (0)
+
+gpusim::KernelImage make_kernel(std::string name, std::uint32_t reg_u32, std::vector<gpusim::InstRecord> insts) {
+  gpusim::KernelImage k;
+  k.name = std::move(name);
+  k.reg_u32_count = reg_u32;
+  k.reg_u64_count = 0;
+  k.insts = std::move(insts);
+  return k;
+}
+
+gpusim::DescriptorRegistry make_registry_for_tests() {
+  using namespace gpusim;
+
+  // Minimal inst_desc JSON for:
+  // - setp (pred,special,imm) -> EXEC SETP in=[1,2] out=[0]
+  // - bra  (imm)             -> CTRL BRA  in=[0]
+  // - bra2 (imm,imm)         -> CTRL BRA  in=[0] and CTRL BRA in=[1] (conflict)
+  // - mov  (reg,imm)         -> EXEC MOV  in=[1] out=[0]
+  const std::string desc_json = R"JSON(
+  {
+    "insts": [
+      {
+        "opcode": "setp",
+        "type_mod": "u32",
+        "operand_kinds": ["pred", "special", "imm"],
+        "uops": [
+          { "kind": "EXEC", "op": "SETP", "in": [1,2], "out": [0] }
+        ]
+      },
+      {
+        "opcode": "bra",
+        "type_mod": "",
+        "operand_kinds": ["imm"],
+        "uops": [
+          { "kind": "CTRL", "op": "BRA", "in": [0], "out": [] }
+        ]
+      },
+      {
+        "opcode": "bra2",
+        "type_mod": "",
+        "operand_kinds": ["imm", "imm"],
+        "uops": [
+          { "kind": "CTRL", "op": "BRA", "in": [0], "out": [] },
+          { "kind": "CTRL", "op": "BRA", "in": [1], "out": [] }
+        ]
+      },
+      {
+        "opcode": "mov",
+        "type_mod": "u32",
+        "operand_kinds": ["reg", "imm"],
+        "uops": [
+          { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+        ]
+      }
+    ]
+  }
+  )JSON";
+
+  DescriptorRegistry reg;
+  reg.load_json_text(desc_json);
+  return reg;
+}
+
+gpusim::Operand imm(std::int64_t v) {
+  gpusim::Operand o;
+  o.kind = gpusim::OperandKind::Imm;
+  o.imm_i64 = v;
+  return o;
+}
+
+gpusim::Operand reg_u32(std::int64_t rid) {
+  gpusim::Operand o;
+  o.kind = gpusim::OperandKind::Reg;
+  o.type = gpusim::ValueType::U32;
+  o.reg_id = rid;
+  return o;
+}
+
+gpusim::Operand pred(std::int64_t pid) {
+  gpusim::Operand o;
+  o.kind = gpusim::OperandKind::Pred;
+  o.pred_id = pid;
+  return o;
+}
+
+gpusim::Operand special(std::string s) {
+  gpusim::Operand o;
+  o.kind = gpusim::OperandKind::Special;
+  o.special = std::move(s);
+  return o;
+}
+
+void test_pred_oob_is_simt_error() {
+  using namespace gpusim;
+
+  auto registry = make_registry_for_tests();
+  ObsControl obs(ObsConfig{ false, 0 });
+  AddrSpaceManager mem;
+
+  SimConfig cfg;
+  cfg.warp_size = 1;
+
+  // Any instruction is fine; we only need to hit the predication injection stage.
+  InstRecord inst;
+  inst.opcode = "mov";
+  inst.mods.type_mod = "u32";
+  inst.pred = PredGuard{ 8, false }; // warp has 8 predicate registers => pid==8 is OOB
+  inst.operands = { reg_u32(0), imm(0) };
+
+  auto kernel = make_kernel("k_pred_oob", /*reg_u32=*/1, { inst });
+
+  SimtExecutor sim(cfg, std::move(registry), obs, mem);
+  auto out = sim.run(kernel);
+  EXPECT_TRUE(!out.completed);
+  EXPECT_TRUE(out.diag.has_value());
+  if (out.diag) {
+    EXPECT_EQ(out.diag->module, std::string("simt"));
+    EXPECT_EQ(out.diag->code, std::string("E_PRED_OOB"));
+  }
+}
+
+void test_uniform_only_divergence_is_fail_fast() {
+  using namespace gpusim;
+
+  auto registry = make_registry_for_tests();
+  ObsControl obs(ObsConfig{ false, 0 });
+  AddrSpaceManager mem;
+
+  SimConfig cfg;
+  cfg.warp_size = 2;
+
+  // 0: setp p0, %laneid, 1  (lt) => lane0=true, lane1=false
+  // 1: @p0 bra 0            => only lane0 enabled => divergence => E_DIVERGENCE_UNSUPPORTED
+  InstRecord setp_inst;
+  setp_inst.opcode = "setp";
+  setp_inst.mods.type_mod = "u32";
+  setp_inst.operands = { pred(0), special("laneid"), imm(1) };
+
+  InstRecord bra_inst;
+  bra_inst.opcode = "bra";
+  bra_inst.pred = PredGuard{ 0, false };
+  bra_inst.operands = { imm(0) };
+
+  auto kernel = make_kernel("k_div", /*reg_u32=*/0, { setp_inst, bra_inst });
+
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ 2, 1, 1 };
+  launch.warp_size = 2;
+
+  SimtExecutor sim(cfg, std::move(registry), obs, mem);
+  auto out = sim.run(kernel, launch);
+  EXPECT_TRUE(!out.completed);
+  EXPECT_TRUE(out.diag.has_value());
+  if (out.diag) {
+    EXPECT_EQ(out.diag->module, std::string("simt"));
+    EXPECT_EQ(out.diag->code, std::string("E_DIVERGENCE_UNSUPPORTED"));
+  }
+}
+
+void test_next_pc_conflict_is_fail_fast() {
+  using namespace gpusim;
+
+  auto registry = make_registry_for_tests();
+  ObsControl obs(ObsConfig{ false, 0 });
+  AddrSpaceManager mem;
+
+  SimConfig cfg;
+  cfg.warp_size = 1;
+
+  InstRecord inst;
+  inst.opcode = "bra2";
+  inst.operands = { imm(1), imm(2) };
+
+  auto kernel = make_kernel("k_next_pc_conflict", /*reg_u32=*/0, { inst });
+
+  SimtExecutor sim(cfg, std::move(registry), obs, mem);
+  auto out = sim.run(kernel);
+  EXPECT_TRUE(!out.completed);
+  EXPECT_TRUE(out.diag.has_value());
+  if (out.diag) {
+    EXPECT_EQ(out.diag->module, std::string("simt"));
+    EXPECT_EQ(out.diag->code, std::string("E_NEXT_PC_CONFLICT"));
+  }
+}
+
+void test_pc_oob_is_fail_fast() {
+  using namespace gpusim;
+
+  auto registry = make_registry_for_tests();
+  ObsControl obs(ObsConfig{ false, 0 });
+  AddrSpaceManager mem;
+
+  SimConfig cfg;
+  cfg.warp_size = 1;
+  cfg.max_steps = 10;
+
+  // PC 0 branches to PC 5; the next fetch will fail with E_PC_OOB.
+  InstRecord inst;
+  inst.opcode = "bra";
+  inst.operands = { imm(5) };
+
+  auto kernel = make_kernel("k_pc_oob", /*reg_u32=*/0, { inst });
+
+  SimtExecutor sim(cfg, std::move(registry), obs, mem);
+  auto out = sim.run(kernel);
+  EXPECT_TRUE(!out.completed);
+  EXPECT_TRUE(out.diag.has_value());
+  if (out.diag) {
+    EXPECT_EQ(out.diag->module, std::string("simt"));
+    EXPECT_EQ(out.diag->code, std::string("E_PC_OOB"));
+  }
+}
+
+} // namespace
+
+int main() {
+  test_pred_oob_is_simt_error();
+  test_uniform_only_divergence_is_fail_fast();
+  test_next_pc_conflict_is_fail_fast();
+  test_pc_oob_is_fail_fast();
+
+  if (g_failures) {
+    std::cerr << "FAILURES: " << g_failures << "\n";
+    return 1;
+  }
+  std::cout << "OK\n";
+  return 0;
+}

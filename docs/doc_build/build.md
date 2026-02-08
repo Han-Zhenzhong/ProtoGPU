@@ -76,6 +76,9 @@ cmake --build build -j
 
 因此建议在“仓库根目录”运行程序；或者显式传入 `--ptx/--ptx-isa/--inst-desc/--config` 的完整路径。
 
+说明
+- `scripts/run_unit_tests.*` / `scripts/run_integration_tests.*` 会自动切到仓库根目录执行，并在 build 目录或可执行文件缺失时自动 build。
+
 ### 运行示例
 
 （从仓库根目录）
@@ -89,6 +92,10 @@ cmake --build build -j
 - trace：`out/trace.jsonl`
 - stats：`out/stats.json`
 
+说明（输出契约 v1 基线）
+- `trace.jsonl` 第 1 行会写入 `TRACE_HEADER`（包含 `format_version/schema/profile/deterministic`）。
+- `stats.json` 顶层也会包含 `format_version/schema/profile/deterministic`（以及 `counters`）。
+
 你也可以指定输出路径：
 
 ```bash
@@ -100,6 +107,34 @@ cmake --build build -j
   --trace out/trace.jsonl \
   --stats out/stats.json
 ```
+
+---
+
+## Tier‑0（唯一 merge gate）快速回归
+
+Tier‑0 的 CTest 名称：`gpu-sim-tiny-gpt2-mincov-tests`
+
+只跑 Tier‑0：
+
+```bash
+ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
+```
+
+或使用脚本入口（会在缺少 build 产物时先自动构建）：
+
+- Windows：`scripts\run_unit_tests.bat build`
+- Bash：`bash scripts/run_unit_tests.sh build`
+
+补充：本仓库也提供一些更 targeted 的回归用例（同样会被 `run_unit_tests.*` 默认包含）：
+- `gpu-sim-inst-desc-tests`
+- `gpu-sim-simt-tests`
+- `gpu-sim-memory-tests`（memory.model / addrspace 路径与诊断码锁定回归）
+- `gpu-sim-public-api-tests`（public Runtime API：in-memory PTX + in-memory JSON assets 回归）
+
+其中 `gpu-sim-public-api-tests` 是一个“打包/嵌入友好”的回归：它不依赖仓库的 `assets/` 路径，直接用 in-memory PTX 与 in-memory JSON assets 验证 public API。
+
+对应的用户侧说明见：
+- `docs/doc_user/public_api.md`
 
 ---
 
@@ -307,6 +342,14 @@ build\Release\gpu-sim-cli.exe --ptx assets\ptx\write_out.ptx --io-demo
 ## 运行测试（CTest）
 
 本仓库使用 CTest 注册测试用例（见根目录 `CMakeLists.txt`）。
+
+常用单元测试 CTest（均由 `scripts/run_unit_tests.*` 覆盖）：
+- `gpu-sim-tests`
+- `gpu-sim-inst-desc-tests`（inst_desc loader/契约相关的 targeted tests）
+- `gpu-sim-simt-tests`（SIMT predication/uniform-only/next_pc 分流相关的 targeted tests）
+- `gpu-sim-builtins-tests`
+- `gpu-sim-config-parse-tests`
+- `gpu-sim-tiny-gpt2-mincov-tests`（Tier‑0 gate）
 
 Ninja/Makefiles（single-config）
 

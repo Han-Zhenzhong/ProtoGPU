@@ -25,6 +25,8 @@ package "frontend" {
 }
 
 package "instruction" {
+  component "PtxIsaRegistry" as Isa
+  component "PtxIsaMapper" as Mapper
   component "DescriptorRegistry" as Reg
   component "Expander" as Exp
 }
@@ -59,8 +61,10 @@ component "File IO" as FileIO
 ' ===== Primary on-disk artifacts =====
 
 artifact "PTX text\nassets/ptx/*.ptx" as PTX
+artifact "PTX ISA map JSON\nassets/ptx_isa/*.json" as IsaJson
 artifact "Inst desc JSON\nassets/inst_desc/*.json" as DescJson
 artifact "App config JSON\nassets/configs/*.json" as CfgJson
+artifact "Workload JSON\nassets/workloads/*.json" as WorkloadJson
 artifact "Trace JSONL\nout/trace.jsonl" as TraceOut
 artifact "Stats JSON\nout/stats.json" as StatsOut
 
@@ -69,10 +73,14 @@ artifact "Stats JSON\nout/stats.json" as StatsOut
 class "AppConfig" as T_AppConfig
 class "ObsConfig" as T_ObsConfig
 class "SimConfig" as T_SimConfig
-class "ModuleImage" as T_ModuleImage
+class "ModuleTokens" as T_ModuleTokens
+class "KernelTokens" as T_KernelTokens
 class "KernelImage" as T_KernelImage
 class "InstRecord" as T_InstRecord
 class "InstDesc" as T_InstDesc
+class "LaunchConfig" as T_Launch
+class "KernelArgs" as T_KernelArgs
+class "RunOutputs" as T_RunOutputs
 class "MicroOp" as T_MicroOp
 class "WarpState" as T_WarpState
 class "StepResult" as T_StepResult
@@ -99,14 +107,24 @@ T_AppConfig --> RT : Runtime(AppConfig)
 
 ' ===== Runtime orchestration =====
 
-CLI --> RT : run_ptx_kernel(ptxPath, instDescPath)
+CLI --> RT : run_ptx_kernel*(\n  ptx, ptx_isa, inst_desc,\n  entry?/args?/launch?\n)
+CLI --> RT : run_workload(workload_json_path)
 
-RT --> Parser : parse_ptx_file(path)
+RT --> Parser : parse_ptx_*_tokens(\n  file or text\n)
 Parser --> FileIO : read PTX
 FileIO --> PTX
-Parser --> T_ModuleImage
-T_ModuleImage --> Binder : bind_first_kernel(...)
-Binder --> T_KernelImage
+Parser --> T_ModuleTokens
+T_ModuleTokens --> Binder : bind_first_kernel(...)\n/ bind_kernel_by_name(...)
+Binder --> T_KernelTokens
+
+RT --> Isa : load_json_*(file or text)
+Isa --> FileIO : read ptx_isa map
+FileIO --> IsaJson
+Isa --> Json : parse(isa JSON)
+Json --> Isa : PtxIsaEntry list
+
+RT --> Mapper : map_kernel(\n  tokenizedInsts, isa\n)
+Mapper --> T_InstRecord
 
 RT --> Reg : load_json_file(path)
 Reg --> FileIO : read inst desc
@@ -120,7 +138,7 @@ RT --> ASM : owned instance
 
 ' ===== SIMT execution data path =====
 
-Simt --> T_KernelImage : run(kernel)
+Simt --> T_KernelImage : run(kernel, launch)
 Simt --> Reg : lookup(InstRecord)
 Reg --> T_InstDesc
 Simt --> Exp : expand(InstRecord, InstDesc, warp_size)
@@ -158,7 +176,8 @@ Obs ..> Trace : contains
 Obs ..> Ctrs : contains
 
 T_KernelImage ..> T_InstRecord : insts[*]
-T_ModuleImage ..> T_KernelImage : kernels[*]
+T_ModuleTokens ..> T_KernelTokens : kernels[*]
+T_KernelTokens ..> T_InstRecord : insts[*] (after map)
 T_InstDesc ..> T_MicroOp : uops[*] (template)
 Simt ..> T_WarpState : local state
 

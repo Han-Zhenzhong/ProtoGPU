@@ -56,6 +56,38 @@ public:
                                                    const KernelArgs& args,
                                                    const LaunchConfig& launch);
 
+  // In-memory overloads: provide PTX text and JSON text for assets.
+  // These preserve the same execution semantics as the file-path APIs, but avoid depending on repo paths.
+  RunOutputs run_ptx_kernel_text(const std::string& ptx_text,
+                                const std::string& ptx_isa_json_text,
+                                const std::string& inst_desc_json_text);
+  RunOutputs run_ptx_kernel_with_args_text(const std::string& ptx_text,
+                                          const std::string& ptx_isa_json_text,
+                                          const std::string& inst_desc_json_text,
+                                          const KernelArgs& args);
+
+  RunOutputs run_ptx_kernel_text_launch(const std::string& ptx_text,
+                                       const std::string& ptx_isa_json_text,
+                                       const std::string& inst_desc_json_text,
+                                       const LaunchConfig& launch);
+  RunOutputs run_ptx_kernel_with_args_text_launch(const std::string& ptx_text,
+                                                 const std::string& ptx_isa_json_text,
+                                                 const std::string& inst_desc_json_text,
+                                                 const KernelArgs& args,
+                                                 const LaunchConfig& launch);
+
+  RunOutputs run_ptx_kernel_text_entry_launch(const std::string& ptx_text,
+                                             const std::string& ptx_isa_json_text,
+                                             const std::string& inst_desc_json_text,
+                                             const std::string& entry,
+                                             const LaunchConfig& launch);
+  RunOutputs run_ptx_kernel_with_args_text_entry_launch(const std::string& ptx_text,
+                                                       const std::string& ptx_isa_json_text,
+                                                       const std::string& inst_desc_json_text,
+                                                       const std::string& entry,
+                                                       const KernelArgs& args,
+                                                       const LaunchConfig& launch);
+
   RunOutputs run_workload(const std::string& workload_json_path);
 
   HostBufId host_alloc(std::uint64_t bytes);

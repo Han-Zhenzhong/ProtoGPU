@@ -12,6 +12,19 @@ static std::uint64_t align_up(std::uint64_t v, std::uint64_t a) {
   return r == 0 ? v : (v + (a - r));
 }
 
+bool AddrSpaceManager::global_range_allocated_nolock(std::uint64_t addr, std::uint64_t size) const {
+  if (size == 0) return true;
+  const auto end = addr + size;
+  if (end < addr) return false; // overflow
+
+  for (const auto& a : allocs_) {
+    const auto a_end = a.base + a.size;
+    if (a_end < a.base) continue; // overflow / corrupt
+    if (addr >= a.base && end <= a_end) return true;
+  }
+  return false;
+}
+
 DevicePtr AddrSpaceManager::alloc_global(std::uint64_t bytes, std::uint64_t align) {
   std::lock_guard<std::mutex> lock(mu_);
   if (align == 0) align = 1;
@@ -22,15 +35,18 @@ DevicePtr AddrSpaceManager::alloc_global(std::uint64_t bytes, std::uint64_t alig
   return base;
 }
 
-void AddrSpaceManager::write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) {
+bool AddrSpaceManager::write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) {
   std::lock_guard<std::mutex> lock(mu_);
+  if (!global_range_allocated_nolock(addr, static_cast<std::uint64_t>(bytes.size()))) return false;
   for (std::size_t i = 0; i < bytes.size(); i++) {
     global_[addr + static_cast<std::uint64_t>(i)] = bytes[i];
   }
+  return true;
 }
 
 std::optional<std::vector<std::uint8_t>> AddrSpaceManager::read_global(std::uint64_t addr, std::uint64_t size) const {
   std::lock_guard<std::mutex> lock(mu_);
+  if (!global_range_allocated_nolock(addr, size)) return std::nullopt;
   std::vector<std::uint8_t> out;
   out.reserve(static_cast<std::size_t>(size));
   for (std::uint64_t i = 0; i < size; i++) {

@@ -9,6 +9,12 @@
 
 namespace gpusim {
 
+struct DescriptorRegistryLoadOptions final {
+  // When true, unknown JSON keys at any level (root/inst/uop) will cause load-time failure.
+  // Default is false to preserve bring-up/backward-compat behavior.
+  bool strict_keys = false;
+};
+
 struct UopTemplate final {
   MicroOpKind kind = MicroOpKind::Exec;
   MicroOpOp op = MicroOpOp::Mov;
@@ -27,6 +33,9 @@ class DescriptorRegistry final {
 public:
   void load_json_file(const std::string& path);
   void load_json_text(const std::string& text);
+
+  void load_json_file(const std::string& path, const DescriptorRegistryLoadOptions& options);
+  void load_json_text(const std::string& text, const DescriptorRegistryLoadOptions& options);
 
   std::optional<InstDesc> lookup(const InstRecord& inst) const;
 

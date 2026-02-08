@@ -10,6 +10,20 @@
 
 namespace gpusim {
 
+struct TraceHeader final {
+  std::uint32_t format_version = 1;
+  std::string schema = "gpusim_trace_jsonl_v1";
+  std::string profile;
+  bool deterministic = false;
+};
+
+struct StatsMeta final {
+  std::uint32_t format_version = 1;
+  std::string schema = "gpusim_stats_v1";
+  std::string profile;
+  bool deterministic = false;
+};
+
 struct ObsConfig final {
   bool enabled = true;
   std::uint64_t trace_capacity = 65536;
@@ -57,6 +71,8 @@ private:
 };
 
 std::string event_to_json_line(const Event& e);
+std::string trace_header_to_json_line(const TraceHeader& h);
 std::string stats_to_json(const std::vector<std::pair<std::string, std::uint64_t>>& counters);
+std::string stats_to_json(const std::vector<std::pair<std::string, std::uint64_t>>& counters, const StatsMeta& meta);
 
 } // namespace gpusim

@@ -113,14 +113,33 @@ std::string event_to_json_line(const Event& e) {
   return gpusim::json::stringify(gpusim::json::Value(std::move(o))) + "\n";
 }
 
-std::string stats_to_json(const std::vector<std::pair<std::string, std::uint64_t>>& counters) {
+std::string trace_header_to_json_line(const TraceHeader& h) {
   gpusim::json::Object o;
+  o.emplace("action", gpusim::json::Value("TRACE_HEADER"));
+  o.emplace("format_version", gpusim::json::Value(static_cast<double>(h.format_version)));
+  o.emplace("schema", gpusim::json::Value(h.schema));
+  o.emplace("profile", gpusim::json::Value(h.profile));
+  o.emplace("deterministic", gpusim::json::Value(h.deterministic));
+  return gpusim::json::stringify(gpusim::json::Value(std::move(o))) + "\n";
+}
+
+std::string stats_to_json(const std::vector<std::pair<std::string, std::uint64_t>>& counters, const StatsMeta& meta) {
+  gpusim::json::Object o;
+  o.emplace("format_version", gpusim::json::Value(static_cast<double>(meta.format_version)));
+  o.emplace("schema", gpusim::json::Value(meta.schema));
+  o.emplace("profile", gpusim::json::Value(meta.profile));
+  o.emplace("deterministic", gpusim::json::Value(meta.deterministic));
+
   gpusim::json::Object cc;
   for (const auto& [k, v] : counters) {
     cc.emplace(k, gpusim::json::Value(static_cast<double>(v)));
   }
   o.emplace("counters", gpusim::json::Value(std::move(cc)));
   return gpusim::json::stringify(gpusim::json::Value(std::move(o)));
+}
+
+std::string stats_to_json(const std::vector<std::pair<std::string, std::uint64_t>>& counters) {
+  return stats_to_json(counters, StatsMeta{});
 }
 
 } // namespace gpusim

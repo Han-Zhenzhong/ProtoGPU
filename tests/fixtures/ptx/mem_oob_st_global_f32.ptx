@@ -1,0 +1,21 @@
+.version 6.4
+.target sm_70
+.address_size 64
+
+.visible .entry mem_oob_st_global_f32(
+    .param .u64 out
+)
+{
+    .reg .u64 %rd<4>;
+    .reg .f32 %f<2>;
+
+    ld.param.u64 %rd1, [out];
+
+    // Load from the valid 4-byte allocation.
+    ld.global.f32 %f0, [%rd1];
+
+    // Store one element past the end: out+4 (OOB for a 4-byte allocation).
+    st.global.f32 [%rd1+4], %f0;
+
+    ret;
+}

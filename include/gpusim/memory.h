@@ -16,7 +16,7 @@ public:
   virtual ~IMemoryModel() = default;
 
   virtual DevicePtr alloc_global(std::uint64_t bytes, std::uint64_t align = 16) = 0;
-  virtual void write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) = 0;
+  virtual bool write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) = 0;
   virtual std::optional<std::vector<std::uint8_t>> read_global(std::uint64_t addr, std::uint64_t size) const = 0;
 
   virtual void set_param_layout(const std::vector<ParamDesc>& layout) = 0;
@@ -27,7 +27,7 @@ public:
 class AddrSpaceManager final : public IMemoryModel {
 public:
   DevicePtr alloc_global(std::uint64_t bytes, std::uint64_t align = 16) override;
-  void write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) override;
+  bool write_global(std::uint64_t addr, const std::vector<std::uint8_t>& bytes) override;
   std::optional<std::vector<std::uint8_t>> read_global(std::uint64_t addr, std::uint64_t size) const override;
 
   void set_param_layout(const std::vector<ParamDesc>& layout) override;
@@ -45,6 +45,8 @@ private:
   std::uint64_t next_global_addr_ = 0x1000;
   std::vector<Allocation> allocs_;
   std::unordered_map<std::uint64_t, std::uint8_t> global_;
+
+  bool global_range_allocated_nolock(std::uint64_t addr, std::uint64_t size) const;
 
   std::unordered_map<std::string, ParamDesc> param_layout_;
   std::vector<std::uint8_t> param_blob_;

@@ -255,11 +255,269 @@ static void test_m4_bra_loop_uniform() {
   EXPECT_EQ((*bytes_out)[3], static_cast<std::uint8_t>(0));
 }
 
+static void test_oob_st_global_must_fail_fast() {
+  using namespace gpusim;
+
+  AppConfig cfg;
+  cfg.sim.warp_size = 1;
+  cfg.sim.max_steps = 100000;
+  cfg.sim.sm_count = 1;
+  cfg.sim.parallel = false;
+  cfg.sim.deterministic = true;
+  cfg.sim.memory_model = "no_cache_addrspace";
+  cfg.sim.cta_scheduler = "fifo";
+  cfg.sim.warp_scheduler = "in_order_run_to_completion";
+  cfg.sim.allow_unknown_selectors = false;
+
+  cfg.obs.enabled = false;
+  cfg.obs.trace_capacity = 0;
+
+  Runtime rt(cfg);
+
+  const std::string ptx = "tests/fixtures/ptx/mem_oob_st_global_f32.ptx";
+  const std::string isa = "assets/ptx_isa/demo_ptx64.json";
+  const std::string desc = "assets/inst_desc/demo_desc.json";
+  const std::string entry = "mem_oob_st_global_f32";
+
+  DevicePtr d_out = rt.device_malloc(4, 16);
+  HostBufId h_out = rt.host_alloc(4);
+
+  // Seed the valid 4 bytes so ld.global.f32 succeeds.
+  {
+    const auto bits = f32_to_bits(1.0f);
+    std::vector<std::uint8_t> bo(4);
+    std::memcpy(bo.data(), &bits, 4);
+    rt.host_write(h_out, 0, bo);
+    rt.memcpy_h2d(d_out, h_out, 0, 4);
+  }
+
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ 1, 1, 1 };
+  launch.warp_size = 1;
+
+  auto ka = make_args_from_ptx(ptx, entry,
+                              {
+                                  {"out", pack_le_u64(d_out)},
+                              });
+
+  auto out = rt.run_ptx_kernel_with_args_launch(ptx, isa, desc, ka, launch);
+  EXPECT_TRUE(!out.sim.completed);
+  EXPECT_TRUE(out.sim.diag.has_value());
+  if (out.sim.diag.has_value()) {
+    EXPECT_EQ(out.sim.diag->code, "E_GLOBAL_MISS");
+  }
+}
+
+static void test_unalloc_ld_global_must_fail_fast() {
+  using namespace gpusim;
+
+  AppConfig cfg;
+  cfg.sim.warp_size = 1;
+  cfg.sim.max_steps = 100000;
+  cfg.sim.sm_count = 1;
+  cfg.sim.parallel = false;
+  cfg.sim.deterministic = true;
+  cfg.sim.memory_model = "no_cache_addrspace";
+  cfg.sim.cta_scheduler = "fifo";
+  cfg.sim.warp_scheduler = "in_order_run_to_completion";
+  cfg.sim.allow_unknown_selectors = false;
+
+  cfg.obs.enabled = false;
+  cfg.obs.trace_capacity = 0;
+
+  Runtime rt(cfg);
+
+  const std::string ptx = "tests/fixtures/ptx/mem_unalloc_ld_global_f32.ptx";
+  const std::string isa = "assets/ptx_isa/demo_ptx64.json";
+  const std::string desc = "assets/inst_desc/demo_desc.json";
+  const std::string entry = "mem_unalloc_ld_global_f32";
+
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ 1, 1, 1 };
+  launch.warp_size = 1;
+
+  // AddrSpaceManager allocations start at 0x1000; address 0 is always unallocated.
+  constexpr DevicePtr unalloc_ptr = 0;
+
+  auto ka = make_args_from_ptx(ptx, entry,
+                              {
+                                  {"in_ptr", pack_le_u64(unalloc_ptr)},
+                              });
+
+  auto out = rt.run_ptx_kernel_with_args_launch(ptx, isa, desc, ka, launch);
+  EXPECT_TRUE(!out.sim.completed);
+  EXPECT_TRUE(out.sim.diag.has_value());
+  if (out.sim.diag.has_value()) {
+    EXPECT_EQ(out.sim.diag->code, "E_GLOBAL_MISS");
+  }
+}
+
+static void test_misaligned_ld_global_must_fail_fast() {
+  using namespace gpusim;
+
+  AppConfig cfg;
+  cfg.sim.warp_size = 1;
+  cfg.sim.max_steps = 100000;
+  cfg.sim.sm_count = 1;
+  cfg.sim.parallel = false;
+  cfg.sim.deterministic = true;
+  cfg.sim.memory_model = "no_cache_addrspace";
+  cfg.sim.cta_scheduler = "fifo";
+  cfg.sim.warp_scheduler = "in_order_run_to_completion";
+  cfg.sim.allow_unknown_selectors = false;
+
+  cfg.obs.enabled = false;
+  cfg.obs.trace_capacity = 0;
+
+  Runtime rt(cfg);
+
+  const std::string ptx = "tests/fixtures/ptx/mem_misaligned_ld_global_f32.ptx";
+  const std::string isa = "assets/ptx_isa/demo_ptx64.json";
+  const std::string desc = "assets/inst_desc/demo_desc.json";
+  const std::string entry = "mem_misaligned_ld_global_f32";
+
+  // Allocate a valid region, then let the fixture access base+2.
+  DevicePtr base = rt.device_malloc(8, 16);
+
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ 1, 1, 1 };
+  launch.warp_size = 1;
+
+  auto ka = make_args_from_ptx(ptx, entry,
+                              {
+                                  {"base_ptr", pack_le_u64(base)},
+                              });
+
+  auto out = rt.run_ptx_kernel_with_args_launch(ptx, isa, desc, ka, launch);
+  EXPECT_TRUE(!out.sim.completed);
+  EXPECT_TRUE(out.sim.diag.has_value());
+  if (out.sim.diag.has_value()) {
+    EXPECT_EQ(out.sim.diag->code, "E_GLOBAL_ALIGN");
+  }
+}
+
+static void test_unknown_selectors_must_fail_fast() {
+  using namespace gpusim;
+
+  const std::string ptx = "tests/fixtures/ptx/m4_bra_loop_u32.ptx";
+  const std::string isa = "assets/ptx_isa/demo_ptx64.json";
+  const std::string desc = "assets/inst_desc/demo_desc.json";
+  const std::string entry = "m4_bra_loop_u32";
+
+  auto run_with = [&](const std::string& memory_model, const std::string& cta_sched, const std::string& warp_sched) {
+    AppConfig cfg;
+    cfg.sim.warp_size = 1;
+    cfg.sim.max_steps = 100000;
+    cfg.sim.sm_count = 1;
+    cfg.sim.parallel = false;
+    cfg.sim.deterministic = true;
+    cfg.sim.memory_model = memory_model;
+    cfg.sim.cta_scheduler = cta_sched;
+    cfg.sim.warp_scheduler = warp_sched;
+    cfg.sim.allow_unknown_selectors = false;
+
+    cfg.obs.enabled = false;
+    cfg.obs.trace_capacity = 0;
+
+    Runtime rt(cfg);
+
+    DevicePtr d_out = rt.device_malloc(4, 16);
+    HostBufId h_out = rt.host_alloc(4);
+    rt.host_write(h_out, 0, std::vector<std::uint8_t>{0xAA, 0xBB, 0xCC, 0xDD});
+    rt.memcpy_h2d(d_out, h_out, 0, 4);
+
+    LaunchConfig launch;
+    launch.grid_dim = Dim3{ 1, 1, 1 };
+    launch.block_dim = Dim3{ 1, 1, 1 };
+    launch.warp_size = 1;
+
+    auto ka = make_args_from_ptx(ptx, entry, { {"out", pack_le_u64(d_out)} });
+    return rt.run_ptx_kernel_with_args_launch(ptx, isa, desc, ka, launch);
+  };
+
+  {
+    auto out = run_with("no_cache_addrspace", "__bogus_cta_sched__", "in_order_run_to_completion");
+    EXPECT_TRUE(!out.sim.completed);
+    EXPECT_TRUE(out.sim.diag.has_value());
+    if (out.sim.diag.has_value()) EXPECT_EQ(out.sim.diag->code, "E_CTA_SCHED");
+  }
+  {
+    auto out = run_with("no_cache_addrspace", "fifo", "__bogus_warp_sched__");
+    EXPECT_TRUE(!out.sim.completed);
+    EXPECT_TRUE(out.sim.diag.has_value());
+    if (out.sim.diag.has_value()) EXPECT_EQ(out.sim.diag->code, "E_WARP_SCHED");
+  }
+  {
+    auto out = run_with("__bogus_memory_model__", "fifo", "in_order_run_to_completion");
+    EXPECT_TRUE(!out.sim.completed);
+    EXPECT_TRUE(out.sim.diag.has_value());
+    if (out.sim.diag.has_value()) EXPECT_EQ(out.sim.diag->code, "E_MEMORY_MODEL");
+  }
+}
+
+static void test_unknown_uop_op_kind_must_fail_at_json_load() {
+  using namespace gpusim;
+
+  {
+    DescriptorRegistry reg;
+    const std::string bad_op = R"({
+  \"insts\": [
+    {
+      \"opcode\": \"mov\",
+      \"type_mod\": \"u32\",
+      \"operand_kinds\": [\"reg\", \"imm\"],
+      \"uops\": [
+        { \"kind\": \"EXEC\", \"op\": \"__BOGUS_OP__\", \"in\": [1], \"out\": [0] }
+      ]
+    }
+  ]
+})";
+    bool threw = false;
+    try {
+      reg.load_json_text(bad_op);
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    EXPECT_TRUE(threw);
+  }
+
+  {
+    DescriptorRegistry reg;
+    const std::string bad_kind = R"({
+  \"insts\": [
+    {
+      \"opcode\": \"mov\",
+      \"type_mod\": \"u32\",
+      \"operand_kinds\": [\"reg\", \"imm\"],
+      \"uops\": [
+        { \"kind\": \"__BOGUS_KIND__\", \"op\": \"MOV\", \"in\": [1], \"out\": [0] }
+      ]
+    }
+  ]
+})";
+    bool threw = false;
+    try {
+      reg.load_json_text(bad_kind);
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    EXPECT_TRUE(threw);
+  }
+}
+
 } // namespace
 
 int main() {
   test_m1_fma_ldst_predication();
   test_m4_bra_loop_uniform();
+  test_oob_st_global_must_fail_fast();
+  test_unalloc_ld_global_must_fail_fast();
+  test_misaligned_ld_global_must_fail_fast();
+  test_unknown_selectors_must_fail_fast();
+  test_unknown_uop_op_kind_must_fail_at_json_load();
 
   if (g_failures) {
     std::cerr << "FAILURES: " << g_failures << "\n";

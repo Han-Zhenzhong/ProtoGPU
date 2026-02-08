@@ -211,16 +211,26 @@ std::optional<Operand> parse_operand_by_kind(const std::string& kind,
     // Let other kinds handle registers/preds.
     if (tok.rfind("%r", 0) == 0 || tok.rfind("%rd", 0) == 0 || tok.rfind("%p", 0) == 0) return std::nullopt;
 
+    const auto name = to_lower(tok.substr(1));
+
+    // Scalar builtins without a dot qualifier.
+    if (name == "laneid" || name == "warpid") {
+      o.kind = OperandKind::Special;
+      o.type = ValueType::U32;
+      o.special = name;
+      (void)type_mod;
+      return o;
+    }
+
+    // Vector-style builtins require a .x/.y/.z qualifier.
     const auto dot = tok.find('.');
     if (dot == std::string::npos) return std::nullopt;
 
-    const auto name = to_lower(tok.substr(1));
     const bool ok =
         name == "tid.x" || name == "tid.y" || name == "tid.z" ||
         name == "ntid.x" || name == "ntid.y" || name == "ntid.z" ||
         name == "ctaid.x" || name == "ctaid.y" || name == "ctaid.z" ||
-        name == "nctaid.x" || name == "nctaid.y" || name == "nctaid.z" ||
-        name == "laneid" || name == "warpid";
+        name == "nctaid.x" || name == "nctaid.y" || name == "nctaid.z";
     if (!ok) {
       diag = Diagnostic{ "frontend", "OPERAND_PARSE_FAIL", "unknown special operand: " + tok, loc, std::nullopt, std::nullopt };
       return std::nullopt;

@@ -11,8 +11,10 @@ participant "ConfigLoader\nload_app_config_json_file" as Config
 participant "FileIO" as FileIO
 participant "json::parse" as Json
 participant "Runtime" as RT
-participant "Frontend::Parser\nparse_ptx_file" as PtxParser
+participant "Frontend::Parser\nparse_ptx_*_tokens" as PtxParser
 participant "Frontend::Binder\nbind_first_kernel" as Binder
+participant "Instruction::PtxIsaRegistry\nload_json_*" as IsaLoad
+participant "Instruction::PtxIsaMapper\nmap_kernel" as IsaMap
 participant "Instruction::DescriptorRegistry\nload_json_file" as RegLoad
 participant "Instruction::DescriptorRegistry\nlookup" as RegLookup
 participant "Instruction::Expander\nexpand" as Expander
@@ -41,7 +43,131 @@ note right of RT
   - AddrSpaceManager
 end note
 
-CLI -> RT: run_ptx_kernel(ptxPath, instDescPath)
+alt Workload mode (--workload)
+  CLI -> RT: run_workload(workloadJsonPath)
+  RT -> FileIO: slurp(workloadJsonPath)
+  FileIO --> RT: text
+  RT -> Json: parse(text)
+  Json --> RT: WorkloadSpec
+  note right of RT
+    For each kernel command:
+    - load module assets (PTX/PTX ISA/inst_desc)
+    - validate launch + bind args
+    - execute via SIMT
+  end note
+else Single-kernel mode
+  CLI -> RT: run_ptx_kernel_*_entry_launch(\n  ptxPath | ptxText,\n  ptxIsaPath | ptxIsaJsonText,\n  instDescPath | instDescJsonText,\n  entry?, args?, launch\n)
+
+  == Frontend (PTX -> tokens) ==
+  alt PTX from file
+    RT -> PtxParser: parse_ptx_file_tokens(ptxPath)
+    PtxParser -> FileIO: open/read ptxPath
+    FileIO --> PtxParser: ptxText
+    PtxParser --> RT: ModuleTokens
+  else PTX from text (in-memory)
+    RT -> PtxParser: parse_ptx_text_tokens(ptxText)
+    PtxParser --> RT: ModuleTokens
+  end
+
+  RT -> Binder: bind_first_kernel(...) / bind_kernel_by_name(...)
+  Binder --> RT: KernelTokens(\n  name, params, regs, tokenized insts\n)
+
+  == Assets (PTX ISA + inst_desc) ==
+  alt PTX ISA from file
+    RT -> IsaLoad: load_json_file(ptxIsaPath)
+    IsaLoad -> FileIO: open/read ptxIsaPath
+    FileIO --> IsaLoad: jsonText
+    IsaLoad -> Json: parse(jsonText)
+    Json --> IsaLoad: PtxIsaEntry list
+  else PTX ISA from text (in-memory)
+    RT -> IsaLoad: load_json_text(ptxIsaJsonText)
+    IsaLoad -> Json: parse(jsonText)
+    Json --> IsaLoad: PtxIsaEntry list
+  end
+
+  alt inst_desc from file
+    RT -> RegLoad: load_json_file(instDescPath)
+    RegLoad -> FileIO: open/read instDescPath
+    FileIO --> RegLoad: jsonText
+    RegLoad -> Json: parse(jsonText)
+    Json --> RegLoad: InstDesc list
+  else inst_desc from text (in-memory)
+    RT -> RegLoad: load_json_text(instDescJsonText)
+    RegLoad -> Json: parse(jsonText)
+    Json --> RegLoad: InstDesc list
+  end
+
+  == Map PTX -> IR InstRecord ==
+  RT -> IsaMap: map_kernel(tokenizedInsts, isa)
+  alt mapping failed
+    IsaMap --> RT: Diagnostic(module/code/message)
+    RT --> CLI: RunOutputs{completed=false, diag}
+  else mapping ok
+    IsaMap --> RT: vector<InstRecord>
+  end
+
+  == Launch + params ==
+  RT -> RT: validate_launch(launch)
+  RT -> RT: mem.set_param_layout(params)\nmem.set_param_blob(args.blob or empty)
+
+  == SIMT execution ==
+  RT -> Simt: SimtExecutor(cfg.sim, registry, ObsControl&, AddrSpaceManager&)
+  RT -> Simt: run(KernelImage, launch)
+
+  loop while (!warp.done && steps < max_steps)
+    Simt -> Obs: emit(Event{cat=FETCH, action=FETCH, pc})
+    Obs -> Trace: push(Event)
+    Simt -> Obs: counter("inst.fetch")
+    Obs -> Ctrs: inc("inst.fetch")
+
+    Simt -> RegLookup: lookup(InstRecord)
+    alt descriptor miss
+      RegLookup --> Simt: nullopt
+      Simt --> RT: SimResult{diag=E_DESC_MISS}
+      break
+    else descriptor hit
+      RegLookup --> Simt: InstDesc
+    end
+
+    Simt -> Expander: expand(inst, desc, warp_size)
+    Expander --> Simt: vector<MicroOp>
+
+    loop for each MicroOp
+      Simt -> Obs: emit(Event{cat=EXEC/CTRL/MEM, action=UOP, pc, opcode_or_uop})
+      Obs -> Trace: push(Event)
+
+      alt uop.kind == Exec
+        Simt -> Exec: step(uop, warp, ObsControl&)
+        Exec -> Obs: counter("uop.exec.*")
+        Obs -> Ctrs: inc(...)
+        Exec --> Simt: StepResult
+      else uop.kind == Control
+        Simt -> Ctrl: step(uop, warp, ObsControl&)
+        Ctrl -> Obs: counter("uop.ctrl.*")
+        Obs -> Ctrs: inc(...)
+        Ctrl --> Simt: StepResult(warp_done possible)
+      else uop.kind == Mem
+        Simt -> Mem: step(uop, warp, ObsControl&)
+        Mem --> Simt: StepResult(diag may be set)
+      end
+
+      alt StepResult.diag is set
+        Simt --> RT: SimResult{diag=StepResult.diag}
+        break
+      end
+    end
+
+    alt warp not done
+      Simt -> Obs: emit(Event{cat=COMMIT, action=COMMIT, pc})
+      Obs -> Trace: push(Event)
+      Simt -> Obs: counter("inst.commit")
+      Obs -> Ctrs: inc("inst.commit")
+    end
+  end
+
+  Simt --> RT: SimResult{completed/diag, steps}
+  RT --> CLI: RunOutputs
+end
 
 == Frontend (PTX) ==
 RT -> PtxParser: parse_ptx_file(ptxPath)

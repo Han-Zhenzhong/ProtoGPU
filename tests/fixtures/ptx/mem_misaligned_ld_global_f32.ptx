@@ -1,0 +1,18 @@
+.version 6.4
+.target sm_70
+.address_size 64
+
+.visible .entry mem_misaligned_ld_global_f32(
+    .param .u64 base_ptr
+)
+{
+    .reg .u64 %rd<2>;
+    .reg .f32 %f<1>;
+
+    ld.param.u64 %rd1, [base_ptr];
+
+    // Misaligned load (base+2) for f32. Must fail-fast with E_GLOBAL_ALIGN.
+    ld.global.f32 %f0, [%rd1+2];
+
+    ret;
+}

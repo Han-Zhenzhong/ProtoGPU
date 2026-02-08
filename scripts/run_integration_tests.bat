@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%\.." >nul
+
 set BUILD_DIR=%~1
 if "%BUILD_DIR%"=="" set BUILD_DIR=build
 
@@ -8,16 +11,31 @@ if "%CONFIG%"=="" (
   set CONFIG=Release
 )
 
-if not exist "%BUILD_DIR%" (
-  echo error: build dir not found: %BUILD_DIR%
-  exit /b 2
+set NEED_BUILD=0
+if not exist "%BUILD_DIR%" set NEED_BUILD=1
+
+if %NEED_BUILD%==0 (
+  if not exist "%BUILD_DIR%\gpu-sim-cli.exe" if not exist "%BUILD_DIR%\%CONFIG%\gpu-sim-cli.exe" set NEED_BUILD=1
+)
+
+if %NEED_BUILD%==1 (
+  echo [integration] build artifacts missing; building first
+  set BUILD_TESTING=ON
+  call "%SCRIPT_DIR%\build.bat" "%BUILD_DIR%" "%CONFIG%"
+  if errorlevel 1 (
+    popd >nul
+    exit /b %errorlevel%
+  )
 )
 
 where ctest >nul 2>nul
 if %errorlevel%==0 (
   echo [integration] running tiny GPT-2 minimal coverage via ctest (build dir: %BUILD_DIR%, config: %CONFIG%)
   ctest --test-dir "%BUILD_DIR%" -C %CONFIG% -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
-  if errorlevel 1 exit /b %errorlevel%
+  if errorlevel 1 (
+    popd >nul
+    exit /b %errorlevel%
+  )
 )
 
 set CLI=
@@ -30,6 +48,7 @@ for %%P in (
 
 if "%CLI%"=="" (
   echo error: cannot find gpu-sim-cli.exe under %BUILD_DIR% (config=%CONFIG%)
+  popd >nul
   exit /b 2
 )
 
@@ -52,19 +71,36 @@ if errorlevel 1 (
   type "%OUT_DIR%\stdout.txt"
   echo --- stderr (%OUT_DIR%\stderr.txt) ---
   type "%OUT_DIR%\stderr.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\trace.jsonl" "%OUT_DIR%\stats.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
+)
+
+findstr /c:"\"action\":\"TRACE_HEADER\"" "%OUT_DIR%\trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected TRACE_HEADER as trace JSONL metadata
+  popd >nul
+  exit /b 1
 )
 
 findstr /c:"\"action\":\"RUN_START\"" "%OUT_DIR%\trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected RUN_START in trace (config_summary missing?)
+  popd >nul
+  exit /b 1
+)
+
+findstr /c:"memory_model" "%OUT_DIR%\trace.jsonl" >nul
+if errorlevel 1 (
+  echo error: expected memory_model to be observable in RUN_START extra
+  popd >nul
   exit /b 1
 )
 
@@ -76,12 +112,14 @@ if errorlevel 1 (
   type "%OUT_DIR%\stdout_parallel.txt"
   echo --- stderr (%OUT_DIR%\stderr_parallel.txt) ---
   type "%OUT_DIR%\stderr_parallel.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\trace_parallel.jsonl" "%OUT_DIR%\stats_parallel.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
 )
@@ -89,6 +127,7 @@ for %%F in ("%OUT_DIR%\trace_parallel.jsonl" "%OUT_DIR%\stats_parallel.json") do
 findstr /c:"\"sm_id\":" "%OUT_DIR%\trace_parallel.jsonl" >nul
 if errorlevel 1 (
   echo error: expected sm_id in parallel trace (did parallel mode run?)
+  popd >nul
   exit /b 1
 )
 
@@ -100,12 +139,14 @@ if errorlevel 1 (
   type "%OUT_DIR%\stdout_modsel.txt"
   echo --- stderr (%OUT_DIR%\stderr_modsel.txt) ---
   type "%OUT_DIR%\stderr_modsel.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\trace_modsel.jsonl" "%OUT_DIR%\stats_modsel.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
 )
@@ -113,18 +154,21 @@ for %%F in ("%OUT_DIR%\trace_modsel.jsonl" "%OUT_DIR%\stats_modsel.json") do (
 findstr /c:"\"action\":\"RUN_START\"" "%OUT_DIR%\trace_modsel.jsonl" >nul
 if errorlevel 1 (
   echo error: expected RUN_START in modular selectors trace
+  popd >nul
   exit /b 1
 )
 
 findstr /c:"sm_round_robin" "%OUT_DIR%\trace_modsel.jsonl" >nul
 if errorlevel 1 (
   echo error: expected cta_scheduler=sm_round_robin to be observable
+  popd >nul
   exit /b 1
 )
 
 findstr /c:"round_robin_interleave_step" "%OUT_DIR%\trace_modsel.jsonl" >nul
 if errorlevel 1 (
   echo error: expected warp_scheduler=round_robin_interleave_step to be observable
+  popd >nul
   exit /b 1
 )
 
@@ -136,6 +180,7 @@ if errorlevel 1 (
   type "%OUT_DIR%\io_stdout.txt"
   echo --- stderr (%OUT_DIR%\io_stderr.txt) ---
   type "%OUT_DIR%\io_stderr.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
@@ -147,12 +192,14 @@ if errorlevel 1 (
   type "%OUT_DIR%\stdout_3d.txt"
   echo --- stderr (%OUT_DIR%\stderr_3d.txt) ---
   type "%OUT_DIR%\stderr_3d.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\trace_3d.jsonl" "%OUT_DIR%\stats_3d.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
 )
@@ -164,6 +211,7 @@ if errorlevel 1 (
   type "%OUT_DIR%\io_stdout.txt"
   echo --- stderr (%OUT_DIR%\io_stderr.txt) ---
   type "%OUT_DIR%\io_stderr.txt"
+  popd >nul
   exit /b 1
 )
 
@@ -175,12 +223,14 @@ if errorlevel 1 (
   type "%OUT_DIR%\workload_single.stdout.txt"
   echo --- stderr (%OUT_DIR%\workload_single.stderr.txt) ---
   type "%OUT_DIR%\workload_single.stderr.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\workload_single.trace.jsonl" "%OUT_DIR%\workload_single.stats.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
 )
@@ -188,12 +238,14 @@ for %%F in ("%OUT_DIR%\workload_single.trace.jsonl" "%OUT_DIR%\workload_single.s
 findstr /c:"\"cat\":\"STREAM\"" "%OUT_DIR%\workload_single.trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected STREAM events in workload trace
+  popd >nul
   exit /b 1
 )
 
 findstr /c:"\"action\":\"cmd_enq\"" "%OUT_DIR%\workload_single.trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected cmd_enq in workload trace
+  popd >nul
   exit /b 1
 )
 
@@ -205,12 +257,14 @@ if errorlevel 1 (
   type "%OUT_DIR%\workload_event.stdout.txt"
   echo --- stderr (%OUT_DIR%\workload_event.stderr.txt) ---
   type "%OUT_DIR%\workload_event.stderr.txt"
+  popd >nul
   exit /b %errorlevel%
 )
 
 for %%F in ("%OUT_DIR%\workload_event.trace.jsonl" "%OUT_DIR%\workload_event.stats.json") do (
   if not exist %%~F (
     echo error: missing output file: %%~F
+    popd >nul
     exit /b 1
   )
 )
@@ -218,14 +272,17 @@ for %%F in ("%OUT_DIR%\workload_event.trace.jsonl" "%OUT_DIR%\workload_event.sta
 findstr /c:"\"action\":\"event_record\"" "%OUT_DIR%\workload_event.trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected event_record in workload trace
+  popd >nul
   exit /b 1
 )
 
 findstr /c:"\"action\":\"event_wait_done\"" "%OUT_DIR%\workload_event.trace.jsonl" >nul
 if errorlevel 1 (
   echo error: expected event_wait_done in workload trace
+  popd >nul
   exit /b 1
 )
 
 echo OK
+popd >nul
 exit /b 0

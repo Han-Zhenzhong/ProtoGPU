@@ -182,10 +182,15 @@ StepResult MemUnit::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
       for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
         if (!lane_mask_test(exec_mask, lane)) continue;
         auto addr = eval_addr_lane(src, warp, lane);
+        if (sz != 0 && (addr % sz) != 0) {
+          r.blocked_reason = BlockedReason::Error;
+          r.diag = Diagnostic{ "units.mem", "E_GLOBAL_ALIGN", "global read is misaligned", std::nullopt, std::nullopt, std::nullopt };
+          return r;
+        }
         auto bytes = mem_.read_global(addr, sz);
         if (!bytes) {
           r.blocked_reason = BlockedReason::Error;
-          r.diag = Diagnostic{ "units.mem", "E_GLOBAL_MISS", "global read failed", std::nullopt, std::nullopt, std::nullopt };
+          r.diag = Diagnostic{ "units.mem", "E_GLOBAL_MISS", "global read failed at addr=" + std::to_string(addr) + " size=" + std::to_string(sz), std::nullopt, std::nullopt, std::nullopt };
           return r;
         }
         auto v = unpack_le(*bytes);
@@ -223,13 +228,22 @@ StepResult MemUnit::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
     for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
       if (!lane_mask_test(exec_mask, lane)) continue;
       auto addr = eval_addr_lane(dst, warp, lane);
+      if (sz != 0 && (addr % sz) != 0) {
+        r.blocked_reason = BlockedReason::Error;
+        r.diag = Diagnostic{ "units.mem", "E_GLOBAL_ALIGN", "global write is misaligned", std::nullopt, std::nullopt, std::nullopt };
+        return r;
+      }
       auto v = read_operand_lane(val, warp, lane);
       if (!v.has_value()) {
         r.diag = Diagnostic{ "units.mem", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
         r.blocked_reason = BlockedReason::Error;
         return r;
       }
-      mem_.write_global(addr, pack_le(*v, sz));
+      if (!mem_.write_global(addr, pack_le(*v, sz))) {
+        r.blocked_reason = BlockedReason::Error;
+        r.diag = Diagnostic{ "units.mem", "E_GLOBAL_MISS", "global write failed at addr=" + std::to_string(addr) + " size=" + std::to_string(sz), std::nullopt, std::nullopt, std::nullopt };
+        return r;
+      }
     }
     obs.counter("uop.mem.st.global");
     r.progressed = true;

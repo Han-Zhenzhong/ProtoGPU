@@ -163,13 +163,23 @@ int main(int argc, char** argv) {
 
     {
       std::ofstream trace(args.trace_out, std::ios::binary);
+
+      gpusim::TraceHeader header;
+      header.profile = cfg.sim.profile;
+      header.deterministic = cfg.sim.deterministic;
+      trace << gpusim::trace_header_to_json_line(header);
+
       for (const auto& e : rt.obs().trace_snapshot()) {
         trace << gpusim::event_to_json_line(e);
       }
     }
     {
       std::ofstream stats(args.stats_out, std::ios::binary);
-      stats << gpusim::stats_to_json(rt.obs().counters_snapshot());
+
+      gpusim::StatsMeta meta;
+      meta.profile = cfg.sim.profile;
+      meta.deterministic = cfg.sim.deterministic;
+      stats << gpusim::stats_to_json(rt.obs().counters_snapshot(), meta);
     }
 
     if (outputs.sim.diag) {

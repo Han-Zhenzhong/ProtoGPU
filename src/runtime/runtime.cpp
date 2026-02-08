@@ -9,6 +9,52 @@
 
 namespace gpusim {
 
+static std::optional<Diagnostic> validate_launch(const LaunchConfig& launch, const std::string& kernel_name);
+
+static RunOutputs run_kernel_tokens_impl(const AppConfig& cfg,
+                                        ObsControl& obs,
+                                        AddrSpaceManager& mem,
+                                        const KernelTokens& kernel_tokens,
+                                        const PtxIsaRegistry& isa,
+                                        DescriptorRegistry reg,
+                                        const KernelArgs* args,
+                                        const LaunchConfig& launch) {
+  RunOutputs out;
+
+  PtxIsaMapper mapper;
+  KernelImage kernel;
+  kernel.name = kernel_tokens.name;
+  kernel.reg_u32_count = kernel_tokens.reg_u32_count;
+  kernel.reg_u64_count = kernel_tokens.reg_u64_count;
+  kernel.params = kernel_tokens.params;
+
+  if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
+    out.sim.diag = *diag;
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
+  if (auto d = validate_launch(launch, kernel.name)) {
+    out.sim.diag = *d;
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
+  // Ensure params never implicitly carry over across runs.
+  mem.set_param_layout(kernel.params);
+  if (args) {
+    mem.set_param_blob(args->blob);
+  } else {
+    mem.set_param_blob({});
+  }
+
+  SimtExecutor exec(cfg.sim, std::move(reg), obs, mem);
+  out.sim = exec.run(kernel, launch);
+  return out;
+}
+
 static std::optional<Diagnostic> validate_launch(const LaunchConfig& launch, const std::string& kernel_name) {
   if (launch.grid_dim.x == 0 || launch.grid_dim.y == 0 || launch.grid_dim.z == 0 ||
       launch.block_dim.x == 0 || launch.block_dim.y == 0 || launch.block_dim.z == 0) {
@@ -167,7 +213,7 @@ DevicePtr Runtime::device_malloc(std::uint64_t bytes, std::uint64_t align) {
 void Runtime::memcpy_h2d(DevicePtr dst, HostBufId src, std::uint64_t src_offset, std::uint64_t bytes) {
   auto data = host_read(src, src_offset, bytes);
   if (!data) throw std::runtime_error("Runtime: memcpy_h2d host_read failed");
-  mem_.write_global(dst, *data);
+  if (!mem_.write_global(dst, *data)) throw std::runtime_error("Runtime: memcpy_h2d write_global failed");
 }
 
 void Runtime::memcpy_d2h(HostBufId dst, std::uint64_t dst_offset, DevicePtr src, std::uint64_t bytes) {
@@ -188,8 +234,6 @@ RunOutputs Runtime::run_ptx_kernel_launch(const std::string& ptx_path,
                                          const std::string& ptx_isa_path,
                                          const std::string& inst_desc_path,
                                          const LaunchConfig& launch) {
-  RunOutputs out;
-
   Parser parser;
   auto mod_tokens = parser.parse_ptx_file_tokens(ptx_path);
   Binder binder;
@@ -198,33 +242,10 @@ RunOutputs Runtime::run_ptx_kernel_launch(const std::string& ptx_path,
   PtxIsaRegistry isa;
   isa.load_json_file(ptx_isa_path);
 
-  PtxIsaMapper mapper;
-  KernelImage kernel;
-  kernel.name = kernel_tokens.name;
-  kernel.reg_u32_count = kernel_tokens.reg_u32_count;
-  kernel.reg_u64_count = kernel_tokens.reg_u64_count;
-  kernel.params = kernel_tokens.params;
-
-  if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
-    out.sim.diag = *diag;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  if (auto d = validate_launch(launch, kernel.name)) {
-    out.sim.diag = *d;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
   DescriptorRegistry reg;
   reg.load_json_file(inst_desc_path);
 
-  SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel, launch);
-  return out;
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), /*args=*/nullptr, launch);
 }
 
 RunOutputs Runtime::run_ptx_kernel_with_args(const std::string& ptx_path,
@@ -243,8 +264,6 @@ RunOutputs Runtime::run_ptx_kernel_with_args_launch(const std::string& ptx_path,
                                                     const std::string& inst_desc_path,
                                                     const KernelArgs& args,
                                                     const LaunchConfig& launch) {
-  RunOutputs out;
-
   Parser parser;
   auto mod_tokens = parser.parse_ptx_file_tokens(ptx_path);
   Binder binder;
@@ -252,37 +271,10 @@ RunOutputs Runtime::run_ptx_kernel_with_args_launch(const std::string& ptx_path,
 
   PtxIsaRegistry isa;
   isa.load_json_file(ptx_isa_path);
-
-  PtxIsaMapper mapper;
-  KernelImage kernel;
-  kernel.name = kernel_tokens.name;
-  kernel.reg_u32_count = kernel_tokens.reg_u32_count;
-  kernel.reg_u64_count = kernel_tokens.reg_u64_count;
-  kernel.params = kernel_tokens.params;
-
-  if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
-    out.sim.diag = *diag;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  if (auto d = validate_launch(launch, kernel.name)) {
-    out.sim.diag = *d;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  mem_.set_param_layout(kernel.params);
-  mem_.set_param_blob(args.blob);
-
   DescriptorRegistry reg;
   reg.load_json_file(inst_desc_path);
 
-  SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel, launch);
-  return out;
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), &args, launch);
 }
 
 RunOutputs Runtime::run_ptx_kernel_entry_launch(const std::string& ptx_path,
@@ -290,8 +282,6 @@ RunOutputs Runtime::run_ptx_kernel_entry_launch(const std::string& ptx_path,
                                                const std::string& inst_desc_path,
                                                const std::string& entry,
                                                const LaunchConfig& launch) {
-  RunOutputs out;
-
   Parser parser;
   auto mod_tokens = parser.parse_ptx_file_tokens(ptx_path);
   Binder binder;
@@ -299,6 +289,7 @@ RunOutputs Runtime::run_ptx_kernel_entry_launch(const std::string& ptx_path,
   try {
     kernel_tokens = binder.bind_kernel_by_name(mod_tokens, entry);
   } catch (const std::exception&) {
+    RunOutputs out;
     out.sim.diag = Diagnostic{ "runtime", "E_ENTRY_NOT_FOUND", "kernel entry not found: " + entry, std::nullopt, entry, std::nullopt };
     out.sim.completed = false;
     out.sim.steps = 0;
@@ -308,33 +299,10 @@ RunOutputs Runtime::run_ptx_kernel_entry_launch(const std::string& ptx_path,
   PtxIsaRegistry isa;
   isa.load_json_file(ptx_isa_path);
 
-  PtxIsaMapper mapper;
-  KernelImage kernel;
-  kernel.name = kernel_tokens.name;
-  kernel.reg_u32_count = kernel_tokens.reg_u32_count;
-  kernel.reg_u64_count = kernel_tokens.reg_u64_count;
-  kernel.params = kernel_tokens.params;
-
-  if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
-    out.sim.diag = *diag;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  if (auto d = validate_launch(launch, kernel.name)) {
-    out.sim.diag = *d;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
   DescriptorRegistry reg;
   reg.load_json_file(inst_desc_path);
 
-  SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel, launch);
-  return out;
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), /*args=*/nullptr, launch);
 }
 
 RunOutputs Runtime::run_ptx_kernel_with_args_entry_launch(const std::string& ptx_path,
@@ -343,8 +311,6 @@ RunOutputs Runtime::run_ptx_kernel_with_args_entry_launch(const std::string& ptx
                                                           const std::string& entry,
                                                           const KernelArgs& args,
                                                           const LaunchConfig& launch) {
-  RunOutputs out;
-
   Parser parser;
   auto mod_tokens = parser.parse_ptx_file_tokens(ptx_path);
   Binder binder;
@@ -352,6 +318,7 @@ RunOutputs Runtime::run_ptx_kernel_with_args_entry_launch(const std::string& ptx
   try {
     kernel_tokens = binder.bind_kernel_by_name(mod_tokens, entry);
   } catch (const std::exception&) {
+    RunOutputs out;
     out.sim.diag = Diagnostic{ "runtime", "E_ENTRY_NOT_FOUND", "kernel entry not found: " + entry, std::nullopt, entry, std::nullopt };
     out.sim.completed = false;
     out.sim.steps = 0;
@@ -360,37 +327,125 @@ RunOutputs Runtime::run_ptx_kernel_with_args_entry_launch(const std::string& ptx
 
   PtxIsaRegistry isa;
   isa.load_json_file(ptx_isa_path);
-
-  PtxIsaMapper mapper;
-  KernelImage kernel;
-  kernel.name = kernel_tokens.name;
-  kernel.reg_u32_count = kernel_tokens.reg_u32_count;
-  kernel.reg_u64_count = kernel_tokens.reg_u64_count;
-  kernel.params = kernel_tokens.params;
-
-  if (auto diag = mapper.map_kernel(kernel_tokens.insts, isa, kernel.insts)) {
-    out.sim.diag = *diag;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  if (auto d = validate_launch(launch, kernel.name)) {
-    out.sim.diag = *d;
-    out.sim.completed = false;
-    out.sim.steps = 0;
-    return out;
-  }
-
-  mem_.set_param_layout(kernel.params);
-  mem_.set_param_blob(args.blob);
-
   DescriptorRegistry reg;
   reg.load_json_file(inst_desc_path);
 
-  SimtExecutor exec(cfg_.sim, std::move(reg), obs_, mem_);
-  out.sim = exec.run(kernel, launch);
-  return out;
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), &args, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_text(const std::string& ptx_text,
+                                       const std::string& ptx_isa_json_text,
+                                       const std::string& inst_desc_json_text) {
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ cfg_.sim.warp_size, 1, 1 };
+  launch.warp_size = cfg_.sim.warp_size;
+  return run_ptx_kernel_text_launch(ptx_text, ptx_isa_json_text, inst_desc_json_text, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_with_args_text(const std::string& ptx_text,
+                                                 const std::string& ptx_isa_json_text,
+                                                 const std::string& inst_desc_json_text,
+                                                 const KernelArgs& args) {
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ cfg_.sim.warp_size, 1, 1 };
+  launch.warp_size = cfg_.sim.warp_size;
+  return run_ptx_kernel_with_args_text_launch(ptx_text, ptx_isa_json_text, inst_desc_json_text, args, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_text_launch(const std::string& ptx_text,
+                                              const std::string& ptx_isa_json_text,
+                                              const std::string& inst_desc_json_text,
+                                              const LaunchConfig& launch) {
+  Parser parser;
+  auto mod_tokens = parser.parse_ptx_text_tokens(ptx_text, "<ptx>");
+  Binder binder;
+  auto kernel_tokens = binder.bind_first_kernel(mod_tokens);
+
+  PtxIsaRegistry isa;
+  isa.load_json_text(ptx_isa_json_text);
+
+  DescriptorRegistry reg;
+  reg.load_json_text(inst_desc_json_text);
+
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), /*args=*/nullptr, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_with_args_text_launch(const std::string& ptx_text,
+                                                        const std::string& ptx_isa_json_text,
+                                                        const std::string& inst_desc_json_text,
+                                                        const KernelArgs& args,
+                                                        const LaunchConfig& launch) {
+  Parser parser;
+  auto mod_tokens = parser.parse_ptx_text_tokens(ptx_text, "<ptx>");
+  Binder binder;
+  auto kernel_tokens = binder.bind_first_kernel(mod_tokens);
+
+  PtxIsaRegistry isa;
+  isa.load_json_text(ptx_isa_json_text);
+
+  DescriptorRegistry reg;
+  reg.load_json_text(inst_desc_json_text);
+
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), &args, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_text_entry_launch(const std::string& ptx_text,
+                                                    const std::string& ptx_isa_json_text,
+                                                    const std::string& inst_desc_json_text,
+                                                    const std::string& entry,
+                                                    const LaunchConfig& launch) {
+  Parser parser;
+  auto mod_tokens = parser.parse_ptx_text_tokens(ptx_text, "<ptx>");
+  Binder binder;
+  KernelTokens kernel_tokens;
+  try {
+    kernel_tokens = binder.bind_kernel_by_name(mod_tokens, entry);
+  } catch (const std::exception&) {
+    RunOutputs out;
+    out.sim.diag = Diagnostic{ "runtime", "E_ENTRY_NOT_FOUND", "kernel entry not found: " + entry, std::nullopt, entry, std::nullopt };
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
+  PtxIsaRegistry isa;
+  isa.load_json_text(ptx_isa_json_text);
+
+  DescriptorRegistry reg;
+  reg.load_json_text(inst_desc_json_text);
+
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), /*args=*/nullptr, launch);
+}
+
+RunOutputs Runtime::run_ptx_kernel_with_args_text_entry_launch(const std::string& ptx_text,
+                                                              const std::string& ptx_isa_json_text,
+                                                              const std::string& inst_desc_json_text,
+                                                              const std::string& entry,
+                                                              const KernelArgs& args,
+                                                              const LaunchConfig& launch) {
+  Parser parser;
+  auto mod_tokens = parser.parse_ptx_text_tokens(ptx_text, "<ptx>");
+  Binder binder;
+  KernelTokens kernel_tokens;
+  try {
+    kernel_tokens = binder.bind_kernel_by_name(mod_tokens, entry);
+  } catch (const std::exception&) {
+    RunOutputs out;
+    out.sim.diag = Diagnostic{ "runtime", "E_ENTRY_NOT_FOUND", "kernel entry not found: " + entry, std::nullopt, entry, std::nullopt };
+    out.sim.completed = false;
+    out.sim.steps = 0;
+    return out;
+  }
+
+  PtxIsaRegistry isa;
+  isa.load_json_text(ptx_isa_json_text);
+
+  DescriptorRegistry reg;
+  reg.load_json_text(inst_desc_json_text);
+
+  return run_kernel_tokens_impl(cfg_, obs_, mem_, kernel_tokens, isa, std::move(reg), &args, launch);
 }
 
 } // namespace gpusim

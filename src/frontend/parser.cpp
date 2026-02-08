@@ -326,6 +326,9 @@ ModuleImage Parser::parse_ptx_text(const std::string& ptx_text) {
       auto after = trim(t.substr(pos + 6));
       auto name_end = after.find('(');
       cur.name = trim(after.substr(0, name_end));
+      if (t.find('{', pos) != std::string::npos) {
+        in_body = true;
+      }
       continue;
     }
     if (in_entry && t == "}") {
@@ -403,6 +406,9 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
       auto after = trim(t.substr(pos + 6));
       auto name_end = after.find('(');
       cur.name = trim(after.substr(0, name_end));
+      if (t.find('{', pos) != std::string::npos) {
+        in_body = true;
+      }
       continue;
     }
     if (in_entry && t == "}") {

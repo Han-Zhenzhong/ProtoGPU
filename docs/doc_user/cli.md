@@ -50,6 +50,41 @@
 
 提示：运行时 trace 会写入一次性的 `RUN_START` 事件，用于观察本次运行实际选择了哪些组件组合。
 
+## 输出格式（trace/stats）契约（v1 基线）
+
+trace（`--trace`）
+- 输出为 JSONL（每行一个 JSON 对象）。
+- 第 1 行固定为 `TRACE_HEADER`：包含 `format_version/schema/profile/deterministic` 等元信息（用于版本化与向后兼容）。
+- 之后为事件流（当前 Tier‑0 最小集会包含：`RUN_START`/`FETCH`/`UOP`/`COMMIT`）。
+- 兼容性说明：`RUN_START.extra` 仍是一个 *stringified JSON*（双层 JSON）字段；脚本依赖的动作名（如 `RUN_START`）保持不变。
+
+stats（`--stats`）
+- 输出为一个 JSON 对象。
+- 顶层字段：`format_version/schema/profile/deterministic/counters`（只做 additive，不删除已有字段）。
+
+## Public Runtime API（C++）
+
+如果你希望把 gpu-sim 当作 C++ 库嵌入使用（尤其是“in-memory PTX + in-memory JSON assets”的打包方式），参照：
+- [doc_user/public_api.md](public_api.md)
+
+该文档包含：
+- `Runtime::run_ptx_kernel_text(...)` 等 in-memory overload 的约定
+- `KernelArgs` / param blob 的用法
+- host/device 内存与 memcpy helpers
+
+## 常见诊断码（Troubleshooting 快速索引）
+
+本项目的失败通常以 `Diagnostic{module, code, message, ...}` 的形式返回（或在少数 helper 中以异常抛出）。下面是用户侧最常见的几类：
+
+- `runtime:E_ENTRY_NOT_FOUND`：entry 名称不存在（PTX module 里没有该 `.entry`）
+- `runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`：grid/block 维度非法或乘法溢出
+- `instruction:DESC_NOT_FOUND`：`--ptx-isa` 缺少某条 PTX opcode 的映射 entry
+- `instruction:DESC_AMBIGUOUS`：同一条 PTX 指令被多条 ISA entry 同时匹配（需要让 `operand_kinds/type_mod` 更精确）
+- `frontend:OPERAND_PARSE_FAIL`：操作数 token 无法按 `operand_kinds` 解析（如寄存器/地址/立即数格式不符合）
+- `simt:E_DESC_MISS`：`--inst-desc` 缺少某条 IR 指令（`ir_op.type_mod(operand_kinds...)`）的语义
+- `simt:E_DIVERGENCE_UNSUPPORTED`：出现分歧控制流（当前里程碑不支持）
+- `simt:E_MEMORY_MODEL`：配置选择了未知 memory model（且 `allow_unknown_selectors=false`）
+
 ## WorkloadSpec（--workload：streams/commands）
 
 用途
@@ -132,6 +167,9 @@ SIMT 侧会对 CTA/warp/lane 做确定性枚举，并为部分 warp 设置 `acti
 本项目将 builtin 作为一种操作数类型（`special`）来支持。当前基线支持：
 - `%tid.{x,y,z}`、`%ntid.{x,y,z}`、`%ctaid.{x,y,z}`、`%nctaid.{x,y,z}`
 - `%laneid`、`%warpid`
+
+注意
+- `%laneid/%warpid` 是标量 builtin（无 `.x/.y/.z` 后缀）。
 
 注意
 - 是否能“执行到 builtin 读取”取决于你提供的 `--ptx-isa` / `--inst-desc` 是否包含对应 form（例如 `mov.u32 (reg, special)`）。

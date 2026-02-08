@@ -4,7 +4,8 @@
 
 ## 前置条件
 
-- 建议从“仓库根目录”执行脚本（使用相对路径资源）
+- 建议从“仓库根目录”执行脚本（使用相对路径资源）。
+- 说明：脚本内部会自动切换到仓库根目录执行，因此也可以从任意工作目录调用。
 
 说明：目前 `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
 
@@ -53,6 +54,15 @@ bash scripts/run_unit_tests.sh build
 
 当前也会包含一个 tiny GPT-2 bring-up 的最小端到端回归：
 - `gpu-sim-tiny-gpt2-mincov-tests`（M1 fma/ld/st/predication + M4 bra loop）
+
+同时也会包含一些更 targeted 的单元测试（例如 inst_desc loader/契约相关）：
+- `gpu-sim-inst-desc-tests`
+- `gpu-sim-simt-tests`（SIMT predication/uniform-only/next_pc 分流相关）
+- `gpu-sim-memory-tests`（memory.model / addrspace 路径与诊断码锁定回归）
+- `gpu-sim-observability-contract-tests`（trace/stats 输出契约：TRACE_HEADER 与 stats meta 字段）
+- `gpu-sim-public-api-tests`（public Runtime API：in-memory PTX + in-memory JSON assets 回归）
+
+其中也包含若干 fail-fast 行为的锁定回归（例如 global OOB/未分配访问必须报错、以及 global 访问对齐检查）。
 
 ## 集成测试
 
