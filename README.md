@@ -2,6 +2,29 @@
 
 本仓库以“设计与规划先行”的方式组织 GPU/PTX VM 的设计与开发材料。
 
+## 核心亮点（为什么这个 sim 值得用）
+
+- 指令集可配（data-driven ISA）
+  - PTX 指令形态（`ptx_opcode/type_mod/operand_kinds`）到内部 IR op 的映射由 `--ptx-isa` JSON 驱动（示例：`assets/ptx_isa/demo_ptx64.json`）。
+  - IR op 的执行语义由 `--inst-desc` JSON 驱动（示例：`assets/inst_desc/demo_desc.json`），便于按“增量覆盖矩阵”持续扩展。
+  - 入口文档：`docs/doc_user/cli.md`。
+
+- micro-op（微指令）组合执行
+  - 指令执行按描述文件展开为 micro-ops（Exec/Control/Mem），由基础执行单元执行；SIMT core 负责 warp mask、predication、分歧/合流等编排。
+  - 设计总览：`docs/doc_design/arch_design.md`。
+
+- 硬件架构可配（模块可替换/可组合）
+  - 把“硬件块图中的关键可替换点”落实为可配置的软件模块（schedulers / memory model / 并行执行模式等），支持只改配置组合出不同 profile。
+  - 用户入口：`docs/doc_user/modular_hw_sw_mapping.md`。
+
+- 当前对外基线：PTX 6.4 + sm_70（功能级）
+  - 以 PTX 6.4（冻结子集）与 sm70 profile 作为 bring-up 与回归锚点；内存基线为 No-cache + 地址空间分类（global/shared/local/const/param）。
+  - 示例与说明：`cuda/demo/README.md`。
+
+- CUDA Runtime shim：让 clang 编译的 CUDA demo 可执行程序接入 gpu-sim
+  - 通过 `libcudart.so.12` 兼容 shim，把 clang 编译的 `.cu` demo host binary 在运行时重定向到 gpu-sim runtime（当前以 Linux/WSL 路径为主）。
+  - 用户指南：`cuda/docs/doc_user/cuda-shim.md`。
+
 ## 文档目录说明
 
 所有文档已统一放在 `docs/` 下：
