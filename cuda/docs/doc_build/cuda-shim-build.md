@@ -1,0 +1,90 @@
+# CUDA Runtime Shim build guide (libcudart.so.12)
+
+This doc describes how to build the CUDA Runtime shim that lets `cuda/demo/demo` run on gpu-sim (no workload JSON).
+
+Prereqs:
+- CMake >= 3.20
+- C++17 compiler
+- A Linux userland to *run* the demo (`cuda/demo/demo` is ELF). On Windows, use WSL2.
+
+Related docs:
+- Requirements: `cuda/docs/cuda-shim-requirement.md`
+- Design: `cuda/docs/doc_design/cuda-shim-logical-design.md`
+- Implementation guide: `cuda/docs/doc_dev/cuda-shim-dev.md`
+
+---
+
+## 1) Build (recommended: out-of-source)
+
+From repo root:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Artifacts:
+- Shim library target: `gpu-sim-cudart-shim`
+  - Produces `libcudart.so.12`-compatible SONAME (`libcudart.so.12` symlink behavior depends on platform/toolchain)
+- Smoke test: `gpu-sim-cudart-shim-smoke-tests`
+
+Notes:
+- The shim implementation lives under `cuda/src/cudart_shim/`.
+- The shim links against `gpusim_core` and uses in-memory Runtime APIs.
+
+---
+
+## 2) Embedded assets generation
+
+The shim embeds 3 JSON assets by default:
+- `assets/configs/demo_config.json`
+- `assets/ptx_isa/demo_ptx64.json`
+- `assets/inst_desc/demo_desc.json`
+
+During build, CMake generates a C++ file:
+- `${build}/generated/cudart_shim/assets_embedded.cpp`
+
+The generator script is:
+- `cmake/generate_cudart_shim_assets.cmake`
+
+If you change any of the 3 JSON files, rebuilding will regenerate the embedded asset TU.
+
+---
+
+## 3) Run unit smoke test (recommended)
+
+After building:
+
+```bash
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-smoke-tests$"
+```
+
+This validates:
+- `cudaMalloc` / `cudaMemcpy` (H2D, D2H) / `cudaFree`
+- Embedded assets initialization path
+
+---
+
+## 4) Troubleshooting build issues
+
+### 4.1 Missing `libcudart.so.12` at runtime
+
+The shim target is named `gpu-sim-cudart-shim`, but the produced file name is controlled via:
+- `OUTPUT_NAME cudart`
+- `SOVERSION 12`
+
+Inspect build output directory:
+
+```bash
+ls -la build | grep cudart
+```
+
+### 4.2 Symbol versioning (`cudaMalloc@libcudart.so.12`)
+
+Some toolchains may require GNU ld symbol version scripts.
+
+MVP policy:
+- Start without a version script.
+- If the loader complains about missing *versioned* symbols, add a version script and link it into `gpu-sim-cudart-shim`.
+
+(Version-script wiring is intentionally not added until we hit the requirement in practice.)

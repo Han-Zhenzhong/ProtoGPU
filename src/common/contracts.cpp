@@ -38,8 +38,10 @@ std::string lane_mask_to_hex(const LaneMask& m) {
 ValueType parse_value_type(const std::string& type_mod) {
   if (type_mod == "u32") return ValueType::U32;
   if (type_mod == "s32") return ValueType::S32;
+  if (type_mod == "b32") return ValueType::U32;
   if (type_mod == "u64") return ValueType::U64;
   if (type_mod == "s64") return ValueType::S64;
+  if (type_mod == "b64") return ValueType::U64;
   if (type_mod == "f32") return ValueType::F32;
   return ValueType::U32;
 }

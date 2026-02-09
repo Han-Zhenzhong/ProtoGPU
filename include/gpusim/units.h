@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 namespace gpusim {
@@ -54,6 +55,10 @@ public:
 
 private:
   IMemoryModel& mem_;
+
+  // Minimal Local memory model for bring-up: sparse byte-addressable storage.
+  // Keyed by a per-thread unique address (derived from CTA + lane + local offset).
+  std::unordered_map<std::uint64_t, std::uint8_t> local_;
 };
 
 } // namespace gpusim

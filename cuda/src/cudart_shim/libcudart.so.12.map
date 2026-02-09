@@ -1,0 +1,25 @@
+# ELF symbol version script for the CUDA runtime shim.
+# This suppresses the loader warning:
+#   "libcudart.so.12: no version information available"
+# by providing a matching symbol version node.
+
+libcudart.so.12 {
+  global:
+    cudaGetLastError;
+    cudaGetErrorString;
+    cudaDeviceSynchronize;
+    cudaMalloc;
+    cudaFree;
+    cudaMemcpy;
+    cudaLaunchKernel;
+
+    __cudaRegisterFatBinary;
+    __cudaRegisterFatBinaryEnd;
+    __cudaUnregisterFatBinary;
+    __cudaRegisterFunction;
+    __cudaPushCallConfiguration;
+    __cudaPopCallConfiguration;
+
+  local:
+    *;
+};

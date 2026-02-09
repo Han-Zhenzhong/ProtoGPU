@@ -1,6 +1,8 @@
 #include "gpusim/units.h"
 
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -49,6 +51,13 @@ static void write_reg_lane(const Operand& o, WarpState& warp, std::uint32_t lane
 static std::optional<std::uint64_t> read_special_u32(const std::string& name,
                                                      const WarpState& warp,
                                                      std::uint32_t lane) {
+  const auto log_builtins = []() -> bool {
+    if (const char* v = std::getenv("GPUSIM_LOG_BUILTINS")) {
+      return v && *v != '\0';
+    }
+    return false;
+  }();
+
   const auto bx = warp.launch.block_dim.x;
   const auto by = warp.launch.block_dim.y;
   const auto bz = warp.launch.block_dim.z;
@@ -62,6 +71,34 @@ static std::optional<std::uint64_t> read_special_u32(const std::string& name,
   const std::uint32_t tid_x = static_cast<std::uint32_t>(thread_linear % bx64);
   const std::uint32_t tid_y = static_cast<std::uint32_t>((thread_linear / bx64) % by64);
   const std::uint32_t tid_z = static_cast<std::uint32_t>(thread_linear / (bxy64 == 0 ? 1 : bxy64));
+
+  if (log_builtins && lane == 0 && (warp.warpid == 0 || warp.warpid == 1)) {
+    static std::uint32_t logged_mask = 0;
+    const std::uint32_t bit = (warp.warpid == 0) ? 1u : 2u;
+    // Log once per warp for the first few builtins we care about.
+    if ((logged_mask & bit) == 0) {
+      if (name == "ctaid.x" || name == "ntid.x" || name == "tid.x") {
+        std::fprintf(stderr,
+                     "[gpu-sim] builtins(warp=%u lane0 base=%u) block=(%u,%u,%u) grid=(%u,%u,%u) ctaid=(%u,%u,%u) tid=(%u,%u,%u) req=%s\n",
+                     static_cast<unsigned>(warp.warpid),
+                     static_cast<unsigned>(warp.lane_base_thread_linear),
+                     static_cast<unsigned>(warp.launch.block_dim.x),
+                     static_cast<unsigned>(warp.launch.block_dim.y),
+                     static_cast<unsigned>(warp.launch.block_dim.z),
+                     static_cast<unsigned>(warp.launch.grid_dim.x),
+                     static_cast<unsigned>(warp.launch.grid_dim.y),
+                     static_cast<unsigned>(warp.launch.grid_dim.z),
+                     static_cast<unsigned>(warp.ctaid.x),
+                     static_cast<unsigned>(warp.ctaid.y),
+                     static_cast<unsigned>(warp.ctaid.z),
+                     static_cast<unsigned>(tid_x),
+                     static_cast<unsigned>(tid_y),
+                     static_cast<unsigned>(tid_z),
+                     name.c_str());
+        logged_mask |= bit;
+      }
+    }
+  }
 
   if (name == "tid.x") return tid_x;
   if (name == "tid.y") return tid_y;
@@ -222,6 +259,41 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
     }
 
     obs.counter("uop.exec.mul");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::Shl: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 2) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "SHL expects 2 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    const bool is_64 = (uop.attrs.type == ValueType::U64 || uop.attrs.type == ValueType::S64 ||
+                        uop.outputs[0].type == ValueType::U64 || uop.outputs[0].type == ValueType::S64);
+    const std::uint32_t shift_mask = is_64 ? 63u : 31u;
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto a = read_operand_lane(uop.inputs[0], warp, lane);
+      auto b = read_operand_lane(uop.inputs[1], warp, lane);
+      if (!a.has_value() || !b.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      const std::uint32_t sh = static_cast<std::uint32_t>(*b) & shift_mask;
+      if (is_64) {
+        const std::uint64_t out = static_cast<std::uint64_t>(*a) << sh;
+        write_reg_lane(uop.outputs[0], warp, lane, out);
+      } else {
+        const std::uint32_t out = static_cast<std::uint32_t>(*a) << sh;
+        write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(out));
+      }
+    }
+
+    obs.counter("uop.exec.shl");
     r.progressed = true;
     return r;
   }

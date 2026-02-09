@@ -7,6 +7,8 @@
 #include "control_flow_analysis.h"
 
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <condition_variable>
 #include <cstdint>
 #include <limits>
@@ -247,6 +249,33 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
       warp.p.assign(static_cast<std::size_t>(8) * warp_size, 1);
     }
 
+    const bool log_warps = []() -> bool {
+      if (const char* v = std::getenv("GPUSIM_LOG_WARPS")) {
+        return v && *v != '\0';
+      }
+      return false;
+    }();
+    if (log_warps) {
+      std::fprintf(stderr,
+                   "[gpu-sim] cta_start(ctaid=(%u,%u,%u) cta_linear=%llu) threads_per_block=%llu warp_size=%u warp_count=%llu\n",
+                   static_cast<unsigned>(item.cx),
+                   static_cast<unsigned>(item.cy),
+                   static_cast<unsigned>(item.cz),
+                   static_cast<unsigned long long>(item.cta_linear),
+                   static_cast<unsigned long long>(threads_per_block),
+                   static_cast<unsigned>(warp_size),
+                   static_cast<unsigned long long>(warp_count));
+      for (std::size_t wi = 0; wi < warps.size(); wi++) {
+        const auto& w = warps[wi];
+        std::fprintf(stderr,
+                     "[gpu-sim]  warp[%zu]: warpid=%u base=%u active=%s\n",
+                     wi,
+                     static_cast<unsigned>(w.warpid),
+                     static_cast<unsigned>(w.lane_base_thread_linear),
+                     lane_mask_to_hex(w.active).c_str());
+      }
+    }
+
     // Precompute reconvergence PC for predicated BRA instructions.
     const auto cfa = analyze_control_flow(kernel, registry_, expander_, warp_size);
     if (cfa.diag) {
@@ -359,7 +388,18 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
 
       const WarpId warp_id = static_cast<WarpId>((item.cta_linear << 32) | static_cast<std::uint64_t>(warp.warpid));
 
-      if (!normalize_stack(warp, item.cta_id, warp_id)) return;
+      if (!normalize_stack(warp, item.cta_id, warp_id)) {
+        // normalize_stack returns false for two reasons:
+        //  1) The warp has no remaining SIMT frames (warp is done)
+        //  2) A fatal reconvergence/stack error occurred (diag was set)
+        // In case (1), keep scheduling other warps in the CTA.
+        // In case (2), stop this CTA immediately.
+        if ((diag_out && diag_out->has_value()) || res.diag.has_value()) {
+          if (scheduler) scheduler->request_stop();
+          return;
+        }
+        continue;
+      }
 
       if (warp.pc < 0 || static_cast<std::size_t>(warp.pc) >= kernel.insts.size()) {
         const auto d = Diagnostic{ "simt", "E_PC_OOB", "PC out of range", std::nullopt, kernel.name, warp.pc };
@@ -453,6 +493,7 @@ SimResult SimtExecutor::run(const KernelImage& kernel, const LaunchConfig& launc
           case MicroOpOp::Mov: return "MOV";
           case MicroOpOp::Add: return "ADD";
           case MicroOpOp::Mul: return "MUL";
+          case MicroOpOp::Shl: return "SHL";
           case MicroOpOp::Fma: return "FMA";
           case MicroOpOp::Setp: return "SETP";
           case MicroOpOp::Ld: return "LD";

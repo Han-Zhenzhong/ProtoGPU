@@ -218,7 +218,17 @@ void Runtime::memcpy_h2d(DevicePtr dst, HostBufId src, std::uint64_t src_offset,
 
 void Runtime::memcpy_d2h(HostBufId dst, std::uint64_t dst_offset, DevicePtr src, std::uint64_t bytes) {
   auto data = mem_.read_global(src, bytes);
-  if (!data) throw std::runtime_error("Runtime: memcpy_d2h read_global failed");
+  if (!data) {
+    // Help diagnose partial writes: locate the first missing byte in the range.
+    std::uint64_t first_missing = 0;
+    for (; first_missing < bytes; first_missing++) {
+      auto one = mem_.read_global(src + first_missing, 1);
+      if (!one) break;
+    }
+    throw std::runtime_error("Runtime: memcpy_d2h read_global failed src=" + std::to_string(src) +
+                             " bytes=" + std::to_string(bytes) +
+                             " first_missing=" + std::to_string(first_missing));
+  }
   host_write(dst, dst_offset, *data);
 }
 

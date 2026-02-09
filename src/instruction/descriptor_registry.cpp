@@ -12,6 +12,7 @@ static MicroOpOp parse_uop_op(const std::string& s) {
   if (s == "MOV") return MicroOpOp::Mov;
   if (s == "ADD") return MicroOpOp::Add;
   if (s == "MUL") return MicroOpOp::Mul;
+  if (s == "SHL") return MicroOpOp::Shl;
   if (s == "FMA") return MicroOpOp::Fma;
   if (s == "SETP") return MicroOpOp::Setp;
   if (s == "LD") return MicroOpOp::Ld;

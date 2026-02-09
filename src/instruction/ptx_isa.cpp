@@ -115,7 +115,7 @@ std::optional<Operand> parse_operand_by_kind(const std::string& kind,
       return std::nullopt; // kind mismatch
     }
 
-    if ((type_mod == "u64" || type_mod == "s64") && o.type == ValueType::U32) {
+    if ((type_mod == "u64" || type_mod == "s64" || type_mod == "b64") && o.type == ValueType::U32) {
       o.type = ValueType::U64;
     }
     return o;

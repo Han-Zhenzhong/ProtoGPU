@@ -106,6 +106,7 @@ enum class MicroOpOp : std::uint16_t {
   Mov,
   Add,
   Mul,
+  Shl,
   Fma,
   Setp,
   Ld,

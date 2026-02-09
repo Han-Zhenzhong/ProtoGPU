@@ -29,6 +29,10 @@ add_library(gpusim_core
   src/simt/warp_scheduler.cpp
 )
 
+# gpusim_core is linked into shared libraries (e.g. the CUDA runtime shim),
+# so it must be built as position-independent code on ELF platforms.
+set_target_properties(gpusim_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(gpusim_core PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -43,6 +47,65 @@ add_executable(gpu-sim-cli
 
 target_link_libraries(gpu-sim-cli PRIVATE gpusim_core)
 
+# --- CUDA Runtime Shim (MVP) ---
+# A minimal libcudart replacement that routes selected CUDA Runtime APIs to gpu-sim.
+set(GPUSIM_CUDART_SHIM_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/cudart_shim")
+set(GPUSIM_CUDART_SHIM_EMBED_CPP "${GPUSIM_CUDART_SHIM_GEN_DIR}/assets_embedded.cpp")
+
+add_custom_command(
+  OUTPUT ${GPUSIM_CUDART_SHIM_EMBED_CPP}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${GPUSIM_CUDART_SHIM_GEN_DIR}
+  COMMAND ${CMAKE_COMMAND}
+          -DOUT=${GPUSIM_CUDART_SHIM_EMBED_CPP}
+          -DCONFIG_JSON=${CMAKE_CURRENT_SOURCE_DIR}/assets/configs/demo_config.json
+          -DPTX_ISA_JSON=${CMAKE_CURRENT_SOURCE_DIR}/assets/ptx_isa/demo_ptx64.json
+          -DINST_DESC_JSON=${CMAKE_CURRENT_SOURCE_DIR}/assets/inst_desc/demo_desc.json
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_cudart_shim_assets.cmake
+  DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_cudart_shim_assets.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/configs/demo_config.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/ptx_isa/demo_ptx64.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets/inst_desc/demo_desc.json
+  VERBATIM
+)
+
+add_library(gpu-sim-cudart-shim SHARED
+  ${GPUSIM_CUDART_SHIM_EMBED_CPP}
+  cuda/src/cudart_shim/exports.cpp
+  cuda/src/cudart_shim/error_state.cpp
+  cuda/src/cudart_shim/assets_provider.cpp
+  cuda/src/cudart_shim/runtime_context.cpp
+  cuda/src/cudart_shim/device_memory.cpp
+  cuda/src/cudart_shim/launch_config_stack.cpp
+  cuda/src/cudart_shim/fatbin_registry.cpp
+  cuda/src/cudart_shim/kernel_registry.cpp
+  cuda/src/cudart_shim/ptx_entry_validate.cpp
+  cuda/src/cudart_shim/kernel_args_pack.cpp
+  cuda/src/cudart_shim/stream_scheduler.cpp
+)
+
+target_include_directories(gpu-sim-cudart-shim PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
+  ${GPUSIM_CUDART_SHIM_GEN_DIR}
+)
+
+target_link_libraries(gpu-sim-cudart-shim PRIVATE gpusim_core)
+
+# Match the loader name expected by Linux demo binaries: libcudart.so.12
+set_target_properties(gpu-sim-cudart-shim PROPERTIES
+  OUTPUT_NAME "cudart"
+  SOVERSION 12
+  VERSION 12.0
+)
+
+# Provide ELF symbol versions expected by some clang/NVIDIA-linked demo binaries.
+if (UNIX AND NOT APPLE)
+  target_link_options(gpu-sim-cudart-shim PRIVATE
+    "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cuda/src/cudart_shim/libcudart.so.12.map"
+  )
+endif()
+
 include(CTest)
 if (BUILD_TESTING)
   add_executable(gpu-sim-tests
@@ -50,6 +113,15 @@ if (BUILD_TESTING)
   )
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
+
+  add_executable(gpu-sim-cudart-shim-smoke-tests
+    tests/cudart_shim_memory_smoke_tests.cpp
+  )
+  target_include_directories(gpu-sim-cudart-shim-smoke-tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
+  )
+  target_link_libraries(gpu-sim-cudart-shim-smoke-tests PRIVATE gpu-sim-cudart-shim)
+  add_test(NAME gpu-sim-cudart-shim-smoke-tests COMMAND gpu-sim-cudart-shim-smoke-tests)
 
   add_executable(gpu-sim-inst-desc-tests
     tests/inst_desc_registry_tests.cpp

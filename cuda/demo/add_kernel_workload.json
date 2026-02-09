@@ -1,0 +1,66 @@
+{
+  "buffers": {
+    "host": {
+      "a_h": { "bytes": 1024, "init": "zeros" },
+      "b_h": { "bytes": 1024, "init": "zeros" },
+      "c_h": { "bytes": 1024, "init": "zeros" }
+    },
+    "device": {
+      "a_d": { "bytes": 1024, "align": 16 },
+      "b_d": { "bytes": 1024, "align": 16 },
+      "c_d": { "bytes": 1024, "align": 16 }
+    }
+  },
+  "modules": {
+    "demo": {
+      "ptx": "cuda/demo/demo.ptx",
+      "ptx_isa": "assets/ptx_isa/demo_ptx64.json",
+      "inst_desc": "assets/inst_desc/demo_desc.json"
+    }
+  },
+  "streams": {
+    "s0": {
+      "commands": [
+        {
+          "copy": {
+            "kind": "H2D",
+            "dst": "a_d",
+            "src": "a_h",
+            "bytes": 1024
+          }
+        },
+        {
+          "copy": {
+            "kind": "H2D",
+            "dst": "b_d",
+            "src": "b_h",
+            "bytes": 1024
+          }
+        },
+        {
+          "kernel": {
+            "module": "demo",
+            "entry": "_Z10add_kernelPKjS0_Pjj",
+            "grid_dim": [2, 1, 1],
+            "block_dim": [128, 1, 1],
+            "args": {
+              "_Z10add_kernelPKjS0_Pjj_param_0": { "ptr_device": "a_d" },
+              "_Z10add_kernelPKjS0_Pjj_param_1": { "ptr_device": "b_d" },
+              "_Z10add_kernelPKjS0_Pjj_param_2": { "ptr_device": "c_d" },
+              "_Z10add_kernelPKjS0_Pjj_param_3": { "u32": 256 }
+            }
+          }
+        },
+        {
+          "copy": {
+            "kind": "D2H",
+            "dst": "c_h",
+            "src": "c_d",
+            "bytes": 1024
+          }
+        },
+        { "sync": {} }
+      ]
+    }
+  }
+}

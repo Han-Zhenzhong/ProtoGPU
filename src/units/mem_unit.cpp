@@ -1,5 +1,8 @@
 #include "gpusim/units.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 namespace gpusim {
 
 namespace {
@@ -102,6 +105,49 @@ static std::uint64_t eval_addr_lane(const Operand& o, const WarpState& warp, std
   return base + static_cast<std::uint64_t>(o.imm_i64);
 }
 
+static std::uint64_t thread_linear_global(const WarpState& warp, std::uint32_t lane) {
+  const std::uint64_t gx = warp.launch.grid_dim.x;
+  const std::uint64_t gy = warp.launch.grid_dim.y;
+  const std::uint64_t cta_linear = static_cast<std::uint64_t>(warp.ctaid.x) +
+                                  gx * (static_cast<std::uint64_t>(warp.ctaid.y) + gy * static_cast<std::uint64_t>(warp.ctaid.z));
+
+  const std::uint64_t bx = warp.launch.block_dim.x;
+  const std::uint64_t by = warp.launch.block_dim.y;
+  const std::uint64_t bz = warp.launch.block_dim.z;
+  const std::uint64_t threads_per_block = bx * by * bz;
+
+  const std::uint64_t lane_linear = static_cast<std::uint64_t>(warp.lane_base_thread_linear) + lane;
+  return cta_linear * threads_per_block + lane_linear;
+}
+
+static std::uint64_t local_effective_addr(const WarpState& warp, std::uint32_t lane, std::uint64_t local_addr) {
+  // Give each thread a fixed-size local window to avoid overlap.
+  // Current demo uses <= 32 bytes, so 4KB per thread is plenty.
+  constexpr std::uint64_t kLocalStride = 4096;
+  const std::uint64_t tid = thread_linear_global(warp, lane);
+  return tid * kLocalStride + local_addr;
+}
+
+static std::vector<std::uint8_t> read_sparse(const std::unordered_map<std::uint64_t, std::uint8_t>& mem,
+                                             std::uint64_t addr,
+                                             std::uint64_t size) {
+  std::vector<std::uint8_t> out;
+  out.reserve(static_cast<std::size_t>(size));
+  for (std::uint64_t i = 0; i < size; i++) {
+    auto it = mem.find(addr + i);
+    out.push_back(it == mem.end() ? static_cast<std::uint8_t>(0) : it->second);
+  }
+  return out;
+}
+
+static void write_sparse(std::unordered_map<std::uint64_t, std::uint8_t>& mem,
+                         std::uint64_t addr,
+                         const std::vector<std::uint8_t>& bytes) {
+  for (std::size_t i = 0; i < bytes.size(); i++) {
+    mem[addr + static_cast<std::uint64_t>(i)] = bytes[i];
+  }
+}
+
 } // namespace
 
 static std::vector<std::uint8_t> pack_le(std::uint64_t v, std::uint64_t size) {
@@ -134,6 +180,13 @@ static std::uint64_t type_size(ValueType t) {
 
 StepResult MemUnit::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
   StepResult r;
+
+  const bool log_stores = []() -> bool {
+    if (const char* v = std::getenv("GPUSIM_LOG_GLOBAL_STORES")) {
+      return v && *v != '\0';
+    }
+    return false;
+  }();
 
   if (warp.done) {
     r.warp_done = true;
@@ -201,6 +254,25 @@ StepResult MemUnit::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
       return r;
     }
 
+    if (uop.attrs.space == AddrSpace::Local) {
+      if (src.kind != OperandKind::Addr) {
+        r.blocked_reason = BlockedReason::Error;
+        r.diag = Diagnostic{ "units.mem", "E_LD_LOCAL_KIND", "ld.local expects addr source", std::nullopt, std::nullopt, std::nullopt };
+        return r;
+      }
+      for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+        if (!lane_mask_test(exec_mask, lane)) continue;
+        const auto local_addr = eval_addr_lane(src, warp, lane);
+        const auto eff = local_effective_addr(warp, lane, local_addr);
+        auto bytes = read_sparse(local_, eff, sz);
+        auto v = unpack_le(bytes);
+        write_reg_lane64(uop.outputs[0], warp, lane, v);
+      }
+      obs.counter("uop.mem.ld.local");
+      r.progressed = true;
+      return r;
+    }
+
     r.blocked_reason = BlockedReason::Error;
     r.diag = Diagnostic{ "units.mem", "E_LD_SPACE", "unsupported ld space", std::nullopt, std::nullopt, std::nullopt };
     return r;
@@ -215,38 +287,79 @@ StepResult MemUnit::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
     const auto& val = uop.inputs[1];
     auto sz = type_size(uop.attrs.type);
 
-    if (uop.attrs.space != AddrSpace::Global) {
-      r.blocked_reason = BlockedReason::Error;
-      r.diag = Diagnostic{ "units.mem", "E_ST_SPACE", "only st.global supported", std::nullopt, std::nullopt, std::nullopt };
+    if (uop.attrs.space == AddrSpace::Global) {
+      if (dst.kind != OperandKind::Addr) {
+        r.blocked_reason = BlockedReason::Error;
+        r.diag = Diagnostic{ "units.mem", "E_ST_GLOBAL_KIND", "st.global expects addr dest", std::nullopt, std::nullopt, std::nullopt };
+        return r;
+      }
+      for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+        if (!lane_mask_test(exec_mask, lane)) continue;
+        auto addr = eval_addr_lane(dst, warp, lane);
+        if (sz != 0 && (addr % sz) != 0) {
+          r.blocked_reason = BlockedReason::Error;
+          r.diag = Diagnostic{ "units.mem", "E_GLOBAL_ALIGN", "global write is misaligned", std::nullopt, std::nullopt, std::nullopt };
+          return r;
+        }
+        auto v = read_operand_lane(val, warp, lane);
+        if (!v.has_value()) {
+          r.diag = Diagnostic{ "units.mem", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+          r.blocked_reason = BlockedReason::Error;
+          return r;
+        }
+
+        if (log_stores && lane == 0 && (warp.warpid == 0 || warp.warpid == 1)) {
+          static std::uint32_t logged_mask = 0;
+          const std::uint32_t bit = (warp.warpid == 0) ? 1u : 2u;
+          if ((logged_mask & bit) == 0) {
+            std::fprintf(stderr,
+                         "[gpu-sim] st.global(warp=%u lane0 base=%u ctaid.x=%u) addr=0x%llx size=%llu val=0x%llx\n",
+                         static_cast<unsigned>(warp.warpid),
+                         static_cast<unsigned>(warp.lane_base_thread_linear),
+                         static_cast<unsigned>(warp.ctaid.x),
+                         static_cast<unsigned long long>(addr),
+                         static_cast<unsigned long long>(sz),
+                         static_cast<unsigned long long>(*v));
+            logged_mask |= bit;
+          }
+        }
+
+        if (!mem_.write_global(addr, pack_le(*v, sz))) {
+          r.blocked_reason = BlockedReason::Error;
+          r.diag = Diagnostic{ "units.mem", "E_GLOBAL_MISS", "global write failed at addr=" + std::to_string(addr) + " size=" + std::to_string(sz), std::nullopt, std::nullopt, std::nullopt };
+          return r;
+        }
+      }
+      obs.counter("uop.mem.st.global");
+      r.progressed = true;
       return r;
     }
-    if (dst.kind != OperandKind::Addr) {
-      r.blocked_reason = BlockedReason::Error;
-      r.diag = Diagnostic{ "units.mem", "E_ST_GLOBAL_KIND", "st.global expects addr dest", std::nullopt, std::nullopt, std::nullopt };
+
+    if (uop.attrs.space == AddrSpace::Local) {
+      if (dst.kind != OperandKind::Addr) {
+        r.blocked_reason = BlockedReason::Error;
+        r.diag = Diagnostic{ "units.mem", "E_ST_LOCAL_KIND", "st.local expects addr dest", std::nullopt, std::nullopt, std::nullopt };
+        return r;
+      }
+      for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+        if (!lane_mask_test(exec_mask, lane)) continue;
+        const auto local_addr = eval_addr_lane(dst, warp, lane);
+        const auto eff = local_effective_addr(warp, lane, local_addr);
+        auto v = read_operand_lane(val, warp, lane);
+        if (!v.has_value()) {
+          r.diag = Diagnostic{ "units.mem", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+          r.blocked_reason = BlockedReason::Error;
+          return r;
+        }
+        write_sparse(local_, eff, pack_le(*v, sz));
+      }
+      obs.counter("uop.mem.st.local");
+      r.progressed = true;
       return r;
     }
-    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
-      if (!lane_mask_test(exec_mask, lane)) continue;
-      auto addr = eval_addr_lane(dst, warp, lane);
-      if (sz != 0 && (addr % sz) != 0) {
-        r.blocked_reason = BlockedReason::Error;
-        r.diag = Diagnostic{ "units.mem", "E_GLOBAL_ALIGN", "global write is misaligned", std::nullopt, std::nullopt, std::nullopt };
-        return r;
-      }
-      auto v = read_operand_lane(val, warp, lane);
-      if (!v.has_value()) {
-        r.diag = Diagnostic{ "units.mem", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
-        r.blocked_reason = BlockedReason::Error;
-        return r;
-      }
-      if (!mem_.write_global(addr, pack_le(*v, sz))) {
-        r.blocked_reason = BlockedReason::Error;
-        r.diag = Diagnostic{ "units.mem", "E_GLOBAL_MISS", "global write failed at addr=" + std::to_string(addr) + " size=" + std::to_string(sz), std::nullopt, std::nullopt, std::nullopt };
-        return r;
-      }
-    }
-    obs.counter("uop.mem.st.global");
-    r.progressed = true;
+
+    r.blocked_reason = BlockedReason::Error;
+    r.diag = Diagnostic{ "units.mem", "E_ST_SPACE", "unsupported st space", std::nullopt, std::nullopt, std::nullopt };
     return r;
   }
   default:

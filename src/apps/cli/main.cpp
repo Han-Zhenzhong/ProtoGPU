@@ -23,6 +23,9 @@ struct Args final {
 
   std::optional<std::string> workload;
 
+  // Single-kernel mode only: pick a specific .entry from the PTX module.
+  std::optional<std::string> entry;
+
   std::optional<gpusim::Dim3> grid;
   std::optional<gpusim::Dim3> block;
 };
@@ -66,6 +69,9 @@ Args parse_args(int argc, char** argv) {
     } else if (k == "--ptx") {
       check_mode_compat("--ptx", false);
       a.ptx = need("--ptx");
+    } else if (k == "--entry") {
+      check_mode_compat("--entry", false);
+      a.entry = need("--entry");
     } else if (k == "--ptx-isa") {
       check_mode_compat("--ptx-isa", false);
       a.ptx_isa = need("--ptx-isa");
@@ -91,7 +97,7 @@ Args parse_args(int argc, char** argv) {
     }
     else if (k == "--help" || k == "-h") {
       std::cout << "gpu-sim-cli --config <file> --trace <file> --stats <file> [--workload <file>]\n"
-                   "  (single-kernel mode) --ptx <file> --ptx-isa <file> --inst-desc <file> [--grid x,y,z] [--block x,y,z] [--io-demo]\n";
+                   "  (single-kernel mode) --ptx <file> --ptx-isa <file> --inst-desc <file> [--entry <name>] [--grid x,y,z] [--block x,y,z] [--io-demo]\n";
       std::exit(0);
     }
   }
@@ -99,6 +105,23 @@ Args parse_args(int argc, char** argv) {
 }
 
 } // namespace
+
+static void print_diag_with_hints(const gpusim::Diagnostic& d) {
+  std::cerr << "Simulation error: " << d.module << ":" << d.code << " " << d.message << "\n";
+  if (d.location) {
+    const auto& loc = *d.location;
+    std::cerr << "  at " << loc.file << ":" << loc.line << ":" << loc.column << "\n";
+  }
+  if (d.inst_index) {
+    std::cerr << "  inst_index=" << *d.inst_index << "\n";
+  }
+
+  if (d.code == "E_PARAM_MISS") {
+    std::cerr << "Hint: ld.param needs a param blob. Single-kernel mode does not automatically supply kernel args.\n"
+                 "  Use --workload <file> (recommended) to allocate buffers, do H2D/D2H copies, and pass args,\n"
+                 "  or use --io-demo for the built-in one-arg demo kernel.\n";
+  }
+}
 
 int main(int argc, char** argv) {
   try {
@@ -129,15 +152,7 @@ int main(int argc, char** argv) {
       outputs = rt.run_ptx_kernel_with_args_launch(args.ptx, args.ptx_isa, args.inst_desc, ka, launch);
 
       if (outputs.sim.diag) {
-        std::cerr << "Simulation error: " << outputs.sim.diag->module << ":" << outputs.sim.diag->code << " "
-                  << outputs.sim.diag->message << "\n";
-        if (outputs.sim.diag->location) {
-          const auto& loc = *outputs.sim.diag->location;
-          std::cerr << "  at " << loc.file << ":" << loc.line << ":" << loc.column << "\n";
-        }
-        if (outputs.sim.diag->inst_index) {
-          std::cerr << "  inst_index=" << *outputs.sim.diag->inst_index << "\n";
-        }
+        print_diag_with_hints(*outputs.sim.diag);
         return 2;
       }
 
@@ -155,7 +170,12 @@ int main(int argc, char** argv) {
       launch.grid_dim = args.grid.value_or(gpusim::Dim3{ 1, 1, 1 });
       launch.block_dim = args.block.value_or(gpusim::Dim3{ cfg.sim.warp_size, 1, 1 });
       launch.warp_size = cfg.sim.warp_size;
-      outputs = rt.run_ptx_kernel_launch(args.ptx, args.ptx_isa, args.inst_desc, launch);
+
+      if (args.entry) {
+        outputs = rt.run_ptx_kernel_entry_launch(args.ptx, args.ptx_isa, args.inst_desc, *args.entry, launch);
+      } else {
+        outputs = rt.run_ptx_kernel_launch(args.ptx, args.ptx_isa, args.inst_desc, launch);
+      }
     }
 
     std::filesystem::create_directories(std::filesystem::path(args.trace_out).parent_path());
@@ -183,15 +203,7 @@ int main(int argc, char** argv) {
     }
 
     if (outputs.sim.diag) {
-      std::cerr << "Simulation error: " << outputs.sim.diag->module << ":" << outputs.sim.diag->code << " "
-                << outputs.sim.diag->message << "\n";
-      if (outputs.sim.diag->location) {
-        const auto& loc = *outputs.sim.diag->location;
-        std::cerr << "  at " << loc.file << ":" << loc.line << ":" << loc.column << "\n";
-      }
-      if (outputs.sim.diag->inst_index) {
-        std::cerr << "  inst_index=" << *outputs.sim.diag->inst_index << "\n";
-      }
+      print_diag_with_hints(*outputs.sim.diag);
       return 2;
     }
     std::cout << "Simulation completed in " << outputs.sim.steps << " steps\n";

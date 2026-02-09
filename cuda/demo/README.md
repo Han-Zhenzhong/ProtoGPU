@@ -1,0 +1,168 @@
+
+# demo.cu 编译与环境配置说明（Ubuntu 24.04）
+
+本目录提供一个最小 CUDA C 示例（demo.cu），并详细说明：
+
+- 如何在 Ubuntu 24.04 下配置 clang 18.1.3 和 CUDA Toolkit 12.x 环境
+- 如何编译 demo.cu 生成可执行程序和 PTX 文件
+- 如何在 gpu-sim 上运行 PTX 6.4/sm_70 并验证仿真
+- 常见问题与排查建议
+- 相关构建文档和官方参考资料链接
+
+适用于希望用 clang+CUDA 工具链配合 gpu-sim 进行 PTX 仿真的开发者。
+
+## 1. 环境准备
+
+> **说明：** clang 和 CUDA Toolkit 有多种安装方式（如 apt、conda、runfile、tar 包、源码编译等），请根据实际环境和需求选择。下述仅以一种常见方式举例，实际路径和版本请以本机为准。
+
+### 1.1 安装 clang 18.1.3
+
+（示例：apt/LLVM 官网脚本安装）
+
+```bash
+# 添加 LLVM apt 源（如未添加）
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 18
+
+# 检查版本
+clang++ --version
+# 应输出 18.1.3
+```
+
+### 1.2 安装 CUDA Toolkit 12.x
+
+（示例：NVIDIA runfile 离线包安装）
+
+1. 下载 runfile 安装包（[NVIDIA 官网](https://developer.nvidia.com/cuda-toolkit-archive)）
+2. 安装：
+
+```bash
+sudo sh cuda_12.3.0_*.run
+# 只装 Toolkit，不装驱动
+# 按提示设置环境变量
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+```
+
+3. 验证头文件和库：
+
+```bash
+ls /usr/local/cuda/include/cuda_runtime.h
+ls /usr/local/cuda/lib64/libcudart.so
+```
+
+## 2. 编译 demo.cu
+
+
+### 2.1 生成可执行程序
+
+
+```bash
+clang++ demo.cu -o demo \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+- `--cuda-path` 指定 CUDA Toolkit 路径（如 /usr/local/cuda，/usr/local/cuda 通常是执行具体 cuda 版本的软连接）
+- `--cuda-gpu-arch` 目标 GPU 架构（如 sm_70）
+- `-lcudart` 链接 CUDA runtime
+
+
+
+### 2.2 生成 PTX 文件
+
+
+```bash
+clang++ demo.cu -o demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+- `--cuda-device-only` 仅生成 device 代码（PTX）
+- `--cuda-feature=+ptx64` 启用 64-bit PTX（通常会输出 `.address_size 64`）
+- 另外一种指定输出的 PTX 版本的选项 `--cuda-ptx-version`，但 clang 18.1.3 **不支持**
+
+可以通过查看 PTX 头部确认版本与架构：
+
+```bash
+head -n 20 demo.ptx
+```
+
+通常应看到类似：
+
+- `.version 6.4`
+- `.target sm_70`
+- `.address_size 64`
+
+---
+
+## 3. 在 gpu-sim 上运行 PTX 6.4/sm_70
+
+假设已编译出 demo.ptx，且已准备好对应的资产文件：
+
+> **注：** `build/gpu-sim-cli` 的编译方法详见 [../../docs/doc_build/build.md](../../docs/doc_build/build.md)。
+
+建议在**仓库根目录**执行（路径与下面命令一致）：
+
+```bash
+./build/gpu-sim-cli \
+  --ptx cuda/demo/demo.ptx \
+  --ptx-isa assets/ptx_isa/demo_ptx64.json \
+  --inst-desc assets/inst_desc/demo_desc.json \
+  --config assets/configs/demo_config.json \
+  --entry add_kernel \
+  --grid 2,1,1 \
+  --block 128,1,1 \
+  --trace out/demo.trace.jsonl \
+  --stats out/demo.stats.json
+```
+
+- `--entry` 指定 kernel 名称（与 demo.cu 保持一致）
+- `--grid`/`--block` 对应 kernel 启动参数（与 host 代码一致）
+- 其余参数请根据实际资产路径调整
+
+如果出现 `entry not found` 之类错误，请打开 PTX 文件查找 `.entry ...` 的真实入口名（可能是 C++ name-mangling 形式，例如 `_Z10add_kernelPKjS0_Pjj`），并用该名字替换 `--entry`。
+
+### 3.1 关于 `.param`（ld.param）与参数注入
+
+`demo.ptx` 里的 kernel 入口是带参数的（3 个指针 + 1 个 u32）。如果用上面的“单 kernel 模式”直接跑，当前实现**不会**自动注入参数 blob，因此会在第一条 `ld.param.*` 处报错（例如 `E_PARAM_MISS`）。
+
+要让 `add_kernel` 真正执行，需要通过 **workload 模式**为 device buffer 分配内存、做 H2D/D2H copy，并打包 kernel 参数：
+
+```bash
+./build/gpu-sim-cli \
+  --config assets/configs/demo_config.json \
+  --workload cuda/demo/add_kernel_workload.json \
+  --trace out/demo.trace.jsonl \
+  --stats out/demo.stats.json
+```
+
+说明：
+- workload 文件会分配 3 个 device buffer（A/B/C，各 256 个 u32），并把参数名（例如 `_Z10add_kernelPKjS0_Pjj_param_0`）映射到这些 buffer 的 device pointer。
+- 该 workload 里 A/B 初始是 zeros，因此 C 预期也是 zeros；当前主要用于验证“能跑通参数 + global memory + 控制流”。
+
+仿真输出如无报错，说明 PTX 及资产配置正确。
+
+---
+
+
+## 4. 常见问题
+
+- clang 18.x 仅支持 CUDA Toolkit ≤ 12.3，13.x 及以上头文件不兼容。
+- 如遇找不到头文件（如 `texture_fetch_functions.h`），请确认 CUDA Toolkit 路径和版本（如 /usr/local/cuda）。
+- 建议全程使用同一版本 clang 和 CUDA，避免混用系统自带 nvcc/clang。
+- 若 gpu-sim 报资产缺失或指令不支持，请补齐对应 JSON 文件。
+- clang 18 某些版本不支持 `--cuda-ptx-version`，如遇报错请移除该参数。
+
+---
+
+## 5. 参考
+- [LLVM 官方文档](https://releases.llvm.org/)
+- [NVIDIA CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
+- [Clang CUDA 支持](https://clang.llvm.org/docs/UsersManual.html#cuda)

@@ -51,8 +51,8 @@ std::optional<std::vector<std::uint8_t>> AddrSpaceManager::read_global(std::uint
   out.reserve(static_cast<std::size_t>(size));
   for (std::uint64_t i = 0; i < size; i++) {
     auto it = global_.find(addr + i);
-    if (it == global_.end()) return std::nullopt;
-    out.push_back(it->second);
+    // Sparse global memory: treat unwritten bytes within an allocated range as 0.
+    out.push_back(it == global_.end() ? static_cast<std::uint8_t>(0) : it->second);
   }
   return out;
 }

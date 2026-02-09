@@ -19,6 +19,36 @@
       "ir_op": "mov"
     },
     {
+      "ptx_opcode": "mov",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "symbol"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "imm"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "cvta",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "mov"
+    },
+    {
       "ptx_opcode": "add",
       "type_mod": "u32",
       "operand_kinds": ["reg", "reg", "reg"],
@@ -26,7 +56,19 @@
     },
     {
       "ptx_opcode": "add",
+      "type_mod": "s32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
       "type_mod": "u64",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
+      "type_mod": "s64",
       "operand_kinds": ["reg", "reg", "reg"],
       "ir_op": "add"
     },
@@ -49,6 +91,18 @@
       "ir_op": "ld"
     },
     {
+      "ptx_opcode": "ld",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "addr"],
+      "ir_op": "ld"
+    },
+    {
+      "ptx_opcode": "ld",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "addr"],
+      "ir_op": "ld"
+    },
+    {
       "ptx_opcode": "st",
       "type_mod": "u32",
       "operand_kinds": ["addr", "reg"],
@@ -61,8 +115,20 @@
       "ir_op": "st"
     },
     {
+      "ptx_opcode": "st",
+      "type_mod": "u64",
+      "operand_kinds": ["addr", "reg"],
+      "ir_op": "st"
+    },
+    {
       "ptx_opcode": "mul",
       "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "mul"
+    },
+    {
+      "ptx_opcode": "mul",
+      "type_mod": "s32",
       "operand_kinds": ["reg", "reg", "reg"],
       "ir_op": "mul"
     },
@@ -89,6 +155,18 @@
       "type_mod": "s32",
       "operand_kinds": ["pred", "reg", "reg"],
       "ir_op": "setp"
+    },
+    {
+      "ptx_opcode": "setp",
+      "type_mod": "u32",
+      "operand_kinds": ["pred", "reg", "reg"],
+      "ir_op": "setp"
+    },
+    {
+      "ptx_opcode": "shl",
+      "type_mod": "",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "ir_op": "shl"
     },
     {
       "ptx_opcode": "bra",

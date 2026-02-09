@@ -357,18 +357,31 @@ ModuleImage Parser::parse_ptx_text(const std::string& ptx_text) {
     }
 
     if (starts_with(t, ".reg")) {
-      // Example: .reg .u32 %r<3>;
+      // Examples:
+      //   .reg .b32 %r<12>;
+      //   .reg .b64 %rd<18>;
+      //   .reg .b64 %SP;
       auto a = split_ws(t);
       if (a.size() >= 3) {
-        auto type = a[1];
         auto decl = a[2];
-        auto lt = decl.find('<');
-        auto gt = decl.find('>');
+        while (!decl.empty() && (decl.back() == ';' || decl.back() == ',')) decl.pop_back();
+        decl = trim(decl);
+
+        const auto lt = decl.find('<');
+        const auto gt = decl.find('>');
         if (lt != std::string::npos && gt != std::string::npos && gt > lt + 1) {
-          auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
-          if (type == ".u32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
-          if (type == ".f32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
-          if (type == ".u64") cur.reg_u64_count = std::max(cur.reg_u64_count, count);
+          const auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
+          if (decl.rfind("%rd<", 0) == 0) cur.reg_u64_count = std::max(cur.reg_u64_count, count);
+          if (decl.rfind("%r<", 0) == 0) cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+          if (decl.rfind("%f<", 0) == 0) cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+        } else {
+          // Named registers (%SP/%SPL) are handled in token-mode parsing; for image parsing,
+          // conservatively bump counts so the register file is large enough.
+          if (decl.rfind("%", 0) == 0) {
+            const auto type = a[1];
+            if (type == ".b64" || type == ".u64") cur.reg_u64_count += 1;
+            if (type == ".b32" || type == ".u32" || type == ".f32") cur.reg_u32_count += 1;
+          }
         }
       }
       continue;
@@ -414,7 +427,30 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
     if (in_entry && t == "}") {
       // Two-pass kernel body processing: bind labels to PC, then tokenize and rewrite bra label -> imm(pc).
       std::unordered_map<std::string, PC> label_to_pc;
+      std::unordered_map<std::string, std::string> reg_alias;
       PC pc = 0;
+
+      // Defer named-register alias assignment until after we've seen all numeric register ranges
+      // (e.g. ".reg .b64 %rd<18>;"). LLVM PTX often declares named regs (%SP/%SPL) before %rd<...>,
+      // and assigning ids too early can collide with real %rd0..%rdN.
+      struct PendingNamedReg final {
+        std::string type; // e.g. ".b64" / ".b32"
+        std::string name; // e.g. "%SP"
+      };
+      std::vector<PendingNamedReg> pending_named;
+
+      auto rewrite_named_regs = [&](std::string& tok) {
+        // Replace occurrences of named registers (e.g. %SP) even when nested in addr forms (e.g. [%SP+8]).
+        for (const auto& kv : reg_alias) {
+          const auto& from = kv.first;
+          const auto& to = kv.second;
+          std::size_t pos = 0;
+          while ((pos = tok.find(from, pos)) != std::string::npos) {
+            tok.replace(pos, from.size(), to);
+            pos += to.size();
+          }
+        }
+      };
 
       for (const auto& it : body_lines) {
         std::string s = it.second;
@@ -427,13 +463,21 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
           if (a.size() >= 3) {
             auto type = a[1];
             auto decl = a[2];
+            while (!decl.empty() && (decl.back() == ';' || decl.back() == ',')) decl.pop_back();
+            decl = trim(decl);
             auto lt = decl.find('<');
             auto gt = decl.find('>');
             if (lt != std::string::npos && gt != std::string::npos && gt > lt + 1) {
               auto count = static_cast<std::uint32_t>(std::stoul(decl.substr(lt + 1, gt - lt - 1)));
-              if (type == ".u32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
-              if (type == ".f32") cur.reg_u32_count = std::max(cur.reg_u32_count, count);
-              if (type == ".u64") cur.reg_u64_count = std::max(cur.reg_u64_count, count);
+              if (decl.rfind("%rd<", 0) == 0) cur.reg_u64_count = std::max(cur.reg_u64_count, count);
+              if (decl.rfind("%r<", 0) == 0) cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+              if (decl.rfind("%f<", 0) == 0) cur.reg_u32_count = std::max(cur.reg_u32_count, count);
+            } else {
+              // Named registers (clang emits %SP/%SPL for local stack) need stable numeric ids.
+              if (!decl.empty() && decl.front() == '%' &&
+                  decl.rfind("%r", 0) != 0 && decl.rfind("%rd", 0) != 0 && decl.rfind("%p", 0) != 0) {
+                pending_named.push_back(PendingNamedReg{ type, decl });
+              }
             }
           }
           continue;
@@ -448,6 +492,20 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
         pc += 1;
       }
 
+      // Now that numeric reg ranges are known, assign ids for named regs without collisions.
+      for (const auto& nr : pending_named) {
+        if (reg_alias.find(nr.name) != reg_alias.end()) continue;
+        if (nr.type == ".b64" || nr.type == ".u64") {
+          const auto id = cur.reg_u64_count;
+          cur.reg_u64_count += 1;
+          reg_alias[nr.name] = "%rd" + std::to_string(id);
+        } else if (nr.type == ".b32" || nr.type == ".u32" || nr.type == ".f32") {
+          const auto id = cur.reg_u32_count;
+          cur.reg_u32_count += 1;
+          reg_alias[nr.name] = "%r" + std::to_string(id);
+        }
+      }
+
       for (const auto& it : body_lines) {
         const auto body_line_no = it.first;
         std::string s = it.second;
@@ -459,6 +517,27 @@ ModuleTokens Parser::parse_ptx_text_tokens(const std::string& ptx_text, const st
         if (!s.empty() && s.back() == ':') continue;
 
         auto inst = tokenize_inst_line(s, file_name, body_line_no);
+        for (auto& tok : inst.operand_tokens) {
+          rewrite_named_regs(tok);
+        }
+
+        // Heuristic for clang/LLVM PTX: stack spills use generic ld/st with a local pointer base (%SP).
+        // If the address base is SP and no explicit space modifier is present, treat it as ld.local/st.local.
+        if (!inst.ptx_opcode.empty() && (inst.ptx_opcode == "ld" || inst.ptx_opcode == "st") && inst.mods.space.empty()) {
+          auto itsp = reg_alias.find("%SP");
+          if (itsp != reg_alias.end()) {
+            const auto& sp_alias = itsp->second;
+            bool uses_sp = false;
+            for (const auto& tok : inst.operand_tokens) {
+              if (tok.find('[') != std::string::npos && tok.find(sp_alias) != std::string::npos) {
+                uses_sp = true;
+                break;
+              }
+            }
+            if (uses_sp) inst.mods.space = "local";
+          }
+        }
+
         if (!inst.ptx_opcode.empty() && inst.ptx_opcode == "bra" && inst.operand_tokens.size() == 1) {
           const auto label = trim(inst.operand_tokens[0]);
           auto itpc = label_to_pc.find(label);
