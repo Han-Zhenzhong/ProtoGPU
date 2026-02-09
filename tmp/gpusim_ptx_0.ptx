@@ -1,0 +1,139 @@
+.version 8.3
+.target sm_70
+.address_size 64
+1
+  .global .align 1 .b8 blockIdx[1];"
+ ?Dim"
+ dthreadE
+
+j
+ $visible .entry _Z10add_kernelPKjS0_Pjj(
+.param .u64%
+  _#
+?_0,-
+  1-
+  2-
+/32 
+  3
+)
+{
+.locI  8I !__ 
+ _depot0[32P  reg .b64 %SP 
+ L 
+ pred %p<2> 
+ b32 %r<1 
+
+C
+qrd<18>;  1mov5 [%SPL,|
+q;
+cvta. 
+ %
+ ,*
+B;
+ldF   
+o%r1, [ 
+  ]5
+  
+ 36
+  26
+
+ 26
+  16
+
+  
+ #0] 
+#to    
+ 4,5  3 
+
+ 
+ 5 
+ 4 
+;
+ 6 
+ 2 
+
+;
+ 7 
+ 6 
+;
+ 8 
+ 1 
+
+;
+ 9 
+Q8;
+stM q[%SP+0] 
+ 9 
+ 8 
+ 7 
+"16 
+ 5C
+"32C
+!24 
+"1;   @  2, %ctaid.x 
+c3, %nt 
+qul.lo.s0
+ . 
+5
+(r3G
+
+)  /
+3add,
+    1
+  
+  
+ 65   
+#7, 
+'8] 
+ 8 
+ 4];
+setp.ge1
+ p1X
+ e   8;
+@%p1 bra $L__BB0_2;
+bra.uni 
+51;
+ 
+D:
+ld
+ #10e
+ 0z
+3d11 
+  
+4shl_  1 
+  
+ 2 
+  
+
+5  P
+
+ 
+!2;e
+  
+ 9 
+3rd1(  z
+ 4c
+
+b
+ I
+
+N   
+ I
+  
+Drd153
+ `
+
+ 
+ f
+
+"
+	c
+ 6c
+$161
+ |
+ ;   
+ d
+ * Ard17  .11F  2F  2:
+ret;
+//
+}

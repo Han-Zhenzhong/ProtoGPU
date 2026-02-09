@@ -31,6 +31,11 @@ if command -v ctest >/dev/null 2>&1; then
   ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 fi
 
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" ]]; then
+  echo "[integration] running CUDA Runtime shim demo integration (if supported)"
+  bash "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" "$BUILD_DIR"
+fi
+
 CLI_CANDIDATES=(
   "$BUILD_DIR/gpu-sim-cli"
   "$BUILD_DIR/gpu-sim-cli.exe"

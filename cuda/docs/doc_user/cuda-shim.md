@@ -35,7 +35,7 @@ export GPUSIM_CUDART_SHIM_LOG=1
 
 Notes:
 - If you forget to set `LD_LIBRARY_PATH`, the demo will likely load your system CUDA `libcudart` instead (and you may see errors like "CUDA driver version is insufficient for CUDA runtime version").
-- If you see `libcudart.so.12: no version information available`, rebuild after the repo adds an ELF version script for the shim.
+- If you see `libcudart.so.12: no version information available`, ensure you are running a recent build of the shim (it uses an ELF version script on Linux/WSL).
 
 If you want to verify linkage:
 
@@ -107,3 +107,21 @@ you can provide a known-good PTX file to the shim:
 - Fatbin parsing is MVP-grade and is only intended to handle the clang-produced demo format in this repo.
 - Streams are treated as synchronous (FIFO model not yet exposed as real async).
 - No `cudaStreamCreate/Destroy` yet.
+
+---
+
+## 6) Tests
+
+On Linux/WSL, there is an end-to-end integration test that runs the prebuilt demo binary against the shim.
+
+Via CTest:
+
+```bash
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
+```
+
+Via repo script (also invoked by `scripts/run_integration_tests.sh`):
+
+```bash
+bash scripts/run_cuda_shim_demo_integration.sh build
+```

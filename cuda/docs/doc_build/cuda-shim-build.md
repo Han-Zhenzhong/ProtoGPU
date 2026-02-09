@@ -65,6 +65,24 @@ This validates:
 
 ---
 
+## 3.1) Run end-to-end demo integration (Linux/WSL)
+
+This runs the prebuilt demo host binary (`cuda/demo/demo`) against the shim via `LD_LIBRARY_PATH` and asserts it prints `OK`.
+
+Via CTest:
+
+```bash
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
+```
+
+Via repo script:
+
+```bash
+bash scripts/run_cuda_shim_demo_integration.sh build
+```
+
+---
+
 ## 4) Troubleshooting build issues
 
 ### 4.1 Missing `libcudart.so.12` at runtime
@@ -83,8 +101,13 @@ ls -la build | grep cudart
 
 Some toolchains may require GNU ld symbol version scripts.
 
-MVP policy:
-- Start without a version script.
-- If the loader complains about missing *versioned* symbols, add a version script and link it into `gpu-sim-cudart-shim`.
+This repo currently enables symbol versioning for the shim on Linux/WSL:
+- Version script: `cuda/src/cudart_shim/libcudart.so.12.map`
+- Linker wiring: root `CMakeLists.txt` adds `-Wl,--version-script=...` to `gpu-sim-cudart-shim` when `UNIX AND NOT APPLE`.
 
-(Version-script wiring is intentionally not added until we hit the requirement in practice.)
+If you want to verify the output contains versioned symbols:
+
+```bash
+readelf --version-info build/libcudart.so.12.0 | sed -n '1,160p'
+nm -D build/libcudart.so.12.0 | grep -E 'cudaMalloc@|__cudaRegisterFatBinary@' || true
+```

@@ -123,6 +123,24 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-cudart-shim-smoke-tests PRIVATE gpu-sim-cudart-shim)
   add_test(NAME gpu-sim-cudart-shim-smoke-tests COMMAND gpu-sim-cudart-shim-smoke-tests)
 
+  # End-to-end shim integration: run the prebuilt ELF demo binary against the shim.
+  # This is Linux/WSL only.
+  if (UNIX AND NOT APPLE)
+    add_test(
+      NAME gpu-sim-cudart-shim-demo-integration
+      COMMAND ${CMAKE_COMMAND} -E env
+              GPUSIM_TEST_SKIP_RC=125
+              GPUSIM_CUDART_SHIM_LOG=0
+              CONFIG=$<CONFIG>
+              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_demo_integration.sh
+                   ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(gpu-sim-cudart-shim-demo-integration PROPERTIES
+      PASS_REGULAR_EXPRESSION "(^|\\n)OK(\\n|$)"
+      SKIP_RETURN_CODE 125
+    )
+  endif()
+
   add_executable(gpu-sim-inst-desc-tests
     tests/inst_desc_registry_tests.cpp
   )
