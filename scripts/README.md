@@ -20,6 +20,10 @@
 在 Linux/WSL 上，集成测试还会尝试跑一个 CUDA Runtime shim 的端到端 demo 回归（如果 `cuda/demo/demo` 可执行且 shim 已构建）：
 - `scripts/run_cuda_shim_demo_integration.sh`
 
+如果本机安装了 clang + CUDA Toolkit（能找到 `CUDA_PATH/include/cuda_runtime.h`），集成测试也会尝试：
+- 编译并运行 `cuda/demo/streaming_demo.cu`（通过 shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`）
+- 脚本入口：`scripts/run_cuda_shim_streaming_demo_cu.sh`
+
 同时，测试脚本会包含一个 tiny GPT-2 bring-up 的最小端到端回归（CTests）：
 - `gpu-sim-tiny-gpt2-mincov-tests`
 

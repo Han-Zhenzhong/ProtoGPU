@@ -4,7 +4,7 @@ This doc explains how to run the clang-built CUDA host demo against gpu-sim via 
 
 Scope:
 - MVP: Linux/WSL, `cuda/demo/demo` loads `libcudart.so.12` from this repo build.
-- The shim currently implements: `cudaMalloc/cudaFree/cudaMemcpy/cudaDeviceSynchronize/cudaGetLastError/cudaGetErrorString` plus the `__cudaRegister*` and `__cudaPush/PopCallConfiguration` hooks.
+- The shim currently implements: `cudaMalloc/cudaFree/cudaMemcpy/cudaMemcpyAsync/cudaDeviceSynchronize/cudaGetLastError/cudaGetErrorString` plus basic stream APIs (`cudaStreamCreate/Destroy/Synchronize/Query`) and the `__cudaRegister*` and `__cudaPush/PopCallConfiguration` hooks.
 - Kernel launch (`cudaLaunchKernel`) is implemented for the demo path using fatbin→PTX extraction + PTX `.param` arg packing.
 
 ---
@@ -41,6 +41,37 @@ If you want to verify linkage:
 
 ```bash
 ldd ./cuda/demo/demo | grep -E 'cudart|not found'
+```
+
+---
+
+## 2.1) Run a streaming CUDA C demo you compiled (clang + CUDA Toolkit)
+
+This repo includes `cuda/demo/streaming_demo.cu`. Because fatbin→PTX extraction is still MVP-grade, run it with a PTX override built from the same source:
+
+```bash
+# 1) build the shim (produces build/libcudart.so.12)
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+
+# 2) compile the CUDA C demo (toolkit-provided headers & system libcudart for link)
+cd cuda/demo
+clang++ streaming_demo.cu -o streaming_demo \
+	--cuda-path=/usr/local/cuda \
+	--cuda-gpu-arch=sm_70 \
+	-I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart
+
+# 3) generate text PTX for the shim override
+clang++ streaming_demo.cu -S -o streaming_demo.ptx \
+	--cuda-path=/usr/local/cuda \
+	--cuda-gpu-arch=sm_70 \
+	--cuda-device-only --cuda-feature=+ptx64 \
+	-I/usr/local/cuda/include
+
+# 4) run under the shim
+export LD_LIBRARY_PATH="$PWD/../../build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/streaming_demo.ptx"
+./streaming_demo
 ```
 
 ---
@@ -105,8 +136,7 @@ you can provide a known-good PTX file to the shim:
 ## 5) Current limitations (MVP in progress)
 
 - Fatbin parsing is MVP-grade and is only intended to handle the clang-produced demo format in this repo.
-- Streams are treated as synchronous (FIFO model not yet exposed as real async).
-- No `cudaStreamCreate/Destroy` yet.
+- Streams preserve FIFO ordering but execute synchronously (no true overlap yet).
 
 ---
 

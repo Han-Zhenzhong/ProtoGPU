@@ -11,7 +11,13 @@ libcudart.so.12 {
     cudaMalloc;
     cudaFree;
     cudaMemcpy;
+    cudaMemcpyAsync;
     cudaLaunchKernel;
+
+    cudaStreamCreate;
+    cudaStreamDestroy;
+    cudaStreamSynchronize;
+    cudaStreamQuery;
 
     __cudaRegisterFatBinary;
     __cudaRegisterFatBinaryEnd;

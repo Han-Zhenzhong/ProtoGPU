@@ -28,7 +28,7 @@ fi
 
 if command -v ctest >/dev/null 2>&1; then
   echo "[unit] running via ctest (unit-only; build dir: $BUILD_DIR, config: $CONFIG)"
-  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-(tests|inst-desc-tests|simt-tests|memory-tests|observability-contract-tests|public-api-tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests)$"
+  ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-(tests|inst-desc-tests|simt-tests|memory-tests|observability-contract-tests|public-api-tests|builtins-tests|config-parse-tests|tiny-gpt2-mincov-tests|cudart-shim-smoke-tests|cudart-shim-streaming-demo)$"
   exit 0
 fi
 

@@ -31,11 +31,6 @@ if command -v ctest >/dev/null 2>&1; then
   ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 fi
 
-if [[ -f "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" ]]; then
-  echo "[integration] running CUDA Runtime shim demo integration (if supported)"
-  bash "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" "$BUILD_DIR"
-fi
-
 CLI_CANDIDATES=(
   "$BUILD_DIR/gpu-sim-cli"
   "$BUILD_DIR/gpu-sim-cli.exe"
@@ -59,6 +54,16 @@ fi
 OUT_DIR="$BUILD_DIR/test_out"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
+
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" ]]; then
+  echo "[integration] running CUDA Runtime shim demo integration (if supported)"
+  bash "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" "$BUILD_DIR"
+fi
+
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" ]]; then
+  echo "[integration] running CUDA Runtime shim streaming .cu demo (if supported)"
+  bash "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" "$BUILD_DIR"
+fi
 
 PTX="assets/ptx/demo_kernel.ptx"
 PTX_DIVERGE="assets/ptx/demo_divergence.ptx"

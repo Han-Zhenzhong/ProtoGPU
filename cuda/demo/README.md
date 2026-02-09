@@ -102,6 +102,56 @@ head -n 20 demo.ptx
 
 ---
 
+## 2.3 编译 streaming_demo.cu（streams + memcpyAsync + kernel）
+
+本 repo 还提供一个更贴近“streaming”使用方式的 CUDA C demo：
+- `cuda/demo/streaming_demo.cu`
+
+它会创建两个 stream，并在各自 stream 上做：H2D -> kernel -> D2H，然后验证结果并输出 `OK`。
+
+### 2.3.1 编译可执行程序
+
+```bash
+clang++ streaming_demo.cu -o streaming_demo \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+### 2.3.2 生成 PTX 文件（用于 shim 的 PTX override）
+
+```bash
+clang++ streaming_demo.cu -S -o streaming_demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+说明：
+- 当前 CUDA Runtime shim 的 fatbin→PTX 提取仍是 MVP 级别（不同工具链可能把 PTX 以 tokenized/encoded 形式放进 fatbin），
+  因此运行这个 demo 时建议用 `GPUSIM_CUDART_SHIM_PTX_OVERRIDE` 显式提供文本 PTX。
+- `-S` 用于强制输出**文本 PTX 汇编**；否则 clang 在某些版本/参数组合下可能把输出当作目标文件或其它中间产物，导致 `*.ptx` 不是可读的 PTX 文本。
+
+### 2.3.3 使用 CUDA Runtime shim 运行（Linux/WSL）
+
+在仓库根目录先构建 shim（得到 `build/libcudart.so.12`），然后把 shim 放到动态加载器优先路径，并设置 PTX override：
+
+```bash
+# repo root
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+
+export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
+
+./cuda/demo/streaming_demo
+```
+
+---
+
 ## 3. 在 gpu-sim 上运行 PTX 6.4/sm_70
 
 假设已编译出 demo.ptx，且已准备好对应的资产文件：

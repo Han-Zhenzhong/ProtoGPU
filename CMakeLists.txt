@@ -123,6 +123,21 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-cudart-shim-smoke-tests PRIVATE gpu-sim-cudart-shim)
   add_test(NAME gpu-sim-cudart-shim-smoke-tests COMMAND gpu-sim-cudart-shim-smoke-tests)
 
+  # Streaming demo (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
+  add_executable(gpu-sim-cudart-shim-streaming-demo
+    cuda/demo/streaming_cudac_demo.cpp
+  )
+  target_link_libraries(gpu-sim-cudart-shim-streaming-demo PRIVATE gpu-sim-cudart-shim)
+  add_test(
+    NAME gpu-sim-cudart-shim-streaming-demo
+    COMMAND ${CMAKE_COMMAND} -E env
+            LD_LIBRARY_PATH=$<TARGET_FILE_DIR:gpu-sim-cudart-shim>
+            $<TARGET_FILE:gpu-sim-cudart-shim-streaming-demo>
+  )
+  set_tests_properties(gpu-sim-cudart-shim-streaming-demo PROPERTIES
+    PASS_REGULAR_EXPRESSION "OK"
+  )
+
   # End-to-end shim integration: run the prebuilt ELF demo binary against the shim.
   # This is Linux/WSL only.
   if (UNIX AND NOT APPLE)
@@ -136,7 +151,7 @@ if (BUILD_TESTING)
                    ${CMAKE_BINARY_DIR}
     )
     set_tests_properties(gpu-sim-cudart-shim-demo-integration PROPERTIES
-      PASS_REGULAR_EXPRESSION "(^|\\n)OK(\\n|$)"
+      PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )
   endif()

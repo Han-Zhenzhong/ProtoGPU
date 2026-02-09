@@ -65,6 +65,18 @@ This validates:
 
 ---
 
+## 3.0) Run streaming demo test (no CUDA toolkit required)
+
+This builds and runs a small C++ executable that links against the shim and exercises:
+- `cudaStreamCreate/Destroy/Synchronize`
+- `cudaMemcpyAsync` on two streams (MVP semantics: synchronous execution, FIFO ordering)
+
+```bash
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-streaming-demo$"
+```
+
+---
+
 ## 3.1) Run end-to-end demo integration (Linux/WSL)
 
 This runs the prebuilt demo host binary (`cuda/demo/demo`) against the shim via `LD_LIBRARY_PATH` and asserts it prints `OK`.

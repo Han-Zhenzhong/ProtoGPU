@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <exception>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -193,6 +194,116 @@ GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaMemcpy(void* dst,
     return fail(cudaErrorUnknown, ex.what());
   } catch (...) {
     return fail(cudaErrorUnknown, "cudaMemcpy: unknown exception");
+  }
+}
+
+// --- Streams (MVP: supported API surface, synchronous execution) ---
+
+namespace gpusim_cudart_shim {
+namespace {
+struct StreamHandle final {
+  std::uint64_t magic = 0x5354524D5F475055ull; // "STRM_GPU" (debug aid)
+};
+
+static StreamHandle* as_stream_handle(cudaStream_t s) {
+  return static_cast<StreamHandle*>(s);
+}
+} // namespace
+} // namespace gpusim_cudart_shim
+
+GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaStreamCreate(gpusim_cudart_shim::cudaStream_t* pStream) {
+  using namespace gpusim_cudart_shim;
+  try {
+    if (!pStream) return fail(cudaErrorInvalidValue, "cudaStreamCreate: pStream is null");
+
+    std::string init_err;
+    if (!ensure_init_or_fail(init_err)) {
+      return fail(cudaErrorInitializationError, init_err);
+    }
+
+    auto* h = new (std::nothrow) StreamHandle();
+    if (!h) return fail(cudaErrorMemoryAllocation, "cudaStreamCreate: allocation failed");
+
+    *pStream = static_cast<cudaStream_t>(h);
+    ErrorState::tls().set(cudaSuccess);
+    return cudaSuccess;
+  } catch (const std::exception& ex) {
+    return fail(cudaErrorUnknown, ex.what());
+  } catch (...) {
+    return fail(cudaErrorUnknown, "cudaStreamCreate: unknown exception");
+  }
+}
+
+GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaStreamDestroy(gpusim_cudart_shim::cudaStream_t stream) {
+  using namespace gpusim_cudart_shim;
+  try {
+    if (!stream) return fail(cudaErrorInvalidValue, "cudaStreamDestroy: cannot destroy default/null stream");
+    auto* h = as_stream_handle(stream);
+    delete h;
+    ErrorState::tls().set(cudaSuccess);
+    return cudaSuccess;
+  } catch (const std::exception& ex) {
+    return fail(cudaErrorUnknown, ex.what());
+  } catch (...) {
+    return fail(cudaErrorUnknown, "cudaStreamDestroy: unknown exception");
+  }
+}
+
+GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaStreamSynchronize(gpusim_cudart_shim::cudaStream_t /*stream*/) {
+  using namespace gpusim_cudart_shim;
+  // MVP: work is executed synchronously, but honor fail-fast init behavior.
+  std::string init_err;
+  if (!RuntimeContext::instance().ensure_initialized(init_err)) {
+    return fail(cudaErrorInitializationError, init_err);
+  }
+  stream_scheduler_singleton().drain_all();
+  ErrorState::tls().set(cudaSuccess);
+  return cudaSuccess;
+}
+
+GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaStreamQuery(gpusim_cudart_shim::cudaStream_t /*stream*/) {
+  using namespace gpusim_cudart_shim;
+  // MVP: always ready.
+  std::string init_err;
+  if (!RuntimeContext::instance().ensure_initialized(init_err)) {
+    return fail(cudaErrorInitializationError, init_err);
+  }
+  ErrorState::tls().set(cudaSuccess);
+  return cudaSuccess;
+}
+
+GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaMemcpyAsync(void* dst,
+                                                                   const void* src,
+                                                                   std::size_t count,
+                                                                   gpusim_cudart_shim::cudaMemcpyKind kind,
+                                                                   gpusim_cudart_shim::cudaStream_t stream) {
+  using namespace gpusim_cudart_shim;
+  try {
+    std::string init_err;
+    if (!ensure_init_or_fail(init_err)) {
+      return fail(cudaErrorInitializationError, init_err);
+    }
+
+    auto& ctx = RuntimeContext::instance();
+    cudaError_t rc = cudaSuccess;
+
+    // Copy arguments to keep command self-contained.
+    void* dst_copy = dst;
+    const void* src_copy = src;
+    std::size_t count_copy = count;
+    cudaMemcpyKind kind_copy = kind;
+
+    stream_scheduler_singleton().submit(stream, [&]() {
+      std::scoped_lock lk(ctx.global_mutex());
+      rc = device_memory_singleton().memcpy(ctx.runtime(), dst_copy, src_copy, count_copy, kind_copy);
+    });
+
+    if (rc == cudaSuccess) ErrorState::tls().set(cudaSuccess);
+    return rc;
+  } catch (const std::exception& ex) {
+    return fail(cudaErrorUnknown, ex.what());
+  } catch (...) {
+    return fail(cudaErrorUnknown, "cudaMemcpyAsync: unknown exception");
   }
 }
 
