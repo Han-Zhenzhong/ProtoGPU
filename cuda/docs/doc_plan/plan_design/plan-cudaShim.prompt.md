@@ -230,7 +230,7 @@ Diagnostics:
 
 ## 11) Build & packaging (CMake)
 
-Add a new target (name TBD, platform-specific output):
+Add a new target (TODO: choose target name, platform-specific output):
 - Linux: `libcudart.so.12`
 - Windows: `cudart64_120.dll` (or toolchain-expected DLL name)
 

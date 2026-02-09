@@ -240,18 +240,35 @@ Non-goals (MVP):
 
 ## Appendix A — Task checklist (for PR breakdown)
 
-- [ ] CMake: `gpu-sim-cudart-shim` shared library target
-- [ ] Minimal CUDA ABI types header
-- [ ] ErrorState (last error + error string)
-- [ ] AssetProvider (env + embedded)
-- [ ] Embedded asset generation (CMake)
-- [ ] RuntimeContext (init + fatal latch)
-- [ ] DeviceMemory (malloc/free/memcpy + validation)
-- [ ] LaunchConfigStack (push/pop)
-- [ ] FatbinRegistry (handle + PTX store)
-- [ ] KernelRegistry (hostFun→deviceName)
-- [ ] Fatbin→PTX extraction (clang)
-- [ ] Entry validation
-- [ ] Arg packing via PTX `.param`
-- [ ] StreamScheduler + DeviceSynchronize
-- [ ] Demo run docs + (optional) version script
+- [x] CMake: `gpu-sim-cudart-shim` shared library target
+- [x] Minimal CUDA ABI types header
+- [x] ErrorState (last error + error string)
+- [x] AssetProvider (env + embedded)
+- [x] Embedded asset generation (CMake; emits `${build}/generated/cudart_shim/assets_embedded.cpp`)
+- [x] RuntimeContext (init + fatal latch)
+- [x] DeviceMemory (malloc/free/memcpy + validation)
+- [x] LaunchConfigStack (push/pop)
+- [x] FatbinRegistry (handle + PTX store)
+- [x] KernelRegistry (hostFun→deviceName)
+- [ ] TODO: Robust fatbin → PTX extraction/decoding for non-plain-text PTX blobs (tokenized/compressed variants)
+- [x] Entry validation
+- [x] Arg packing via PTX `.param`
+- [x] StreamScheduler + DeviceSynchronize
+- [x] Demo run docs + (optional) version script
+
+---
+
+## Post-MVP TODOs
+
+Parallel streams (async execution):
+- TODO(cuda-shim-streams): Decide default-stream semantics (legacy vs per-thread default stream) and document.
+- TODO(cuda-shim-streams): Add background execution in `StreamScheduler` (per-stream worker or shared pool) with clean shutdown.
+- TODO(cuda-shim-streams): Implement `cudaStreamCreate` / `cudaStreamDestroy`.
+- TODO(cuda-shim-streams): Implement `cudaStreamSynchronize` / `cudaStreamQuery`.
+- TODO(cuda-shim-streams): Optional — implement `cudaMemcpyAsync` + ordering tests.
+
+Multi-GPU scheduling:
+- TODO(cuda-shim-multi-gpu): Implement `cudaGetDeviceCount` / `cudaGetDevice` / `cudaSetDevice` (thread-local current device).
+- TODO(cuda-shim-multi-gpu): Split into per-device `DeviceContext` (runtime + memory + registries).
+- TODO(cuda-shim-multi-gpu): Enforce pointer ownership (device pointer only valid on allocating device).
+- TODO(cuda-shim-multi-gpu): Make streams device-scoped; define behavior for cross-device stream usage.

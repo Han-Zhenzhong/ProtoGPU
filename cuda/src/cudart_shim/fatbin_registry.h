@@ -27,7 +27,7 @@ private:
   std::unordered_map<ModuleId, FatbinModule> modules_;
   std::unordered_map<void**, ModuleId> handle_to_id_;
 
-  // TODO(M4): fatbin->PTX extraction.
+  // TODO(M4): Robust fatbin -> PTX extraction/decoding (tokenized/compressed variants).
   static std::vector<std::string> extract_ptx_texts_mvp(void* fat_cubin);
 };
 
