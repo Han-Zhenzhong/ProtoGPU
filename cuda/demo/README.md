@@ -1,62 +1,61 @@
+# demo.cu build and environment setup (Ubuntu 24.04)
 
-# demo.cu 编译与环境配置说明（Ubuntu 24.04）
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-本目录提供一个最小 CUDA C 示例（demo.cu），并详细说明：
+This directory provides a minimal CUDA C example (`demo.cu`) and explains:
 
-- 如何在 Ubuntu 24.04 下配置 clang 18.1.3 和 CUDA Toolkit 12.x 环境
-- 如何编译 demo.cu 生成可执行程序和 PTX 文件
-- 如何在 gpu-sim 上运行 PTX 6.4/sm_70 并验证仿真
-- 常见问题与排查建议
-- 相关构建文档和官方参考资料链接
+- How to set up clang 18.1.3 and CUDA Toolkit 12.x on Ubuntu 24.04
+- How to compile `demo.cu` into an executable and a PTX file
+- How to run PTX 6.4 / sm_70 on gpu-sim and validate the simulation
+- Common issues and troubleshooting tips
+- Related build docs and official reference links
 
-适用于希望用 clang+CUDA 工具链配合 gpu-sim 进行 PTX 仿真的开发者。
+Intended for developers who want to use a clang+CUDA toolchain with gpu-sim for PTX simulation.
 
-## 1. 环境准备
+## 1. Environment preparation
 
-> **说明：** clang 和 CUDA Toolkit 有多种安装方式（如 apt、conda、runfile、tar 包、源码编译等），请根据实际环境和需求选择。下述仅以一种常见方式举例，实际路径和版本请以本机为准。
+> Note: clang and CUDA Toolkit can be installed in many ways (apt, conda, runfile, tarball, source build, etc.). The steps below show one common approach; adjust paths/versions for your machine.
 
-### 1.1 安装 clang 18.1.3
+### 1.1 Install clang 18.1.3
 
-（示例：apt/LLVM 官网脚本安装）
+(Example: apt / LLVM official script)
 
 ```bash
-# 添加 LLVM apt 源（如未添加）
+# Add LLVM apt repo (if not already added)
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
 sudo ./llvm.sh 18
 
-# 检查版本
+# Check version
 clang++ --version
-# 应输出 18.1.3
+# should print 18.1.3
 ```
 
-### 1.2 安装 CUDA Toolkit 12.x
+### 1.2 Install CUDA Toolkit 12.x
 
-（示例：NVIDIA runfile 离线包安装）
+(Example: NVIDIA runfile offline installer)
 
-1. 下载 runfile 安装包（[NVIDIA 官网](https://developer.nvidia.com/cuda-toolkit-archive)）
-2. 安装：
+1. Download the runfile installer from the [NVIDIA CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
+2. Install:
 
 ```bash
 sudo sh cuda_12.3.0_*.run
-# 只装 Toolkit，不装驱动
-# 按提示设置环境变量
+# Install Toolkit only, do not install the driver
+# Follow prompts to set env vars
 export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ```
 
-3. 验证头文件和库：
+3. Verify headers and libraries:
 
 ```bash
 ls /usr/local/cuda/include/cuda_runtime.h
 ls /usr/local/cuda/lib64/libcudart.so
 ```
 
-## 2. 编译 demo.cu
+## 2. Build demo.cu
 
-
-### 2.1 生成可执行程序
-
+### 2.1 Build the executable
 
 ```bash
 clang++ demo.cu -o demo \
@@ -66,14 +65,11 @@ clang++ demo.cu -o demo \
   -I/usr/local/cuda/include
 ```
 
-- `--cuda-path` 指定 CUDA Toolkit 路径（如 /usr/local/cuda，/usr/local/cuda 通常是执行具体 cuda 版本的软连接）
-- `--cuda-gpu-arch` 目标 GPU 架构（如 sm_70）
-- `-lcudart` 链接 CUDA runtime
+- `--cuda-path` specifies the CUDA Toolkit path (e.g. `/usr/local/cuda`; this is often a symlink to a specific CUDA version)
+- `--cuda-gpu-arch` sets the target GPU architecture (e.g. `sm_70`)
+- `-lcudart` links the CUDA runtime
 
-
-
-### 2.2 生成 PTX 文件
-
+### 2.2 Generate a PTX file
 
 ```bash
 clang++ demo.cu -o demo.ptx \
@@ -84,17 +80,17 @@ clang++ demo.cu -o demo.ptx \
   -I/usr/local/cuda/include
 ```
 
-- `--cuda-device-only` 仅生成 device 代码（PTX）
-- `--cuda-feature=+ptx64` 启用 64-bit PTX（通常会输出 `.address_size 64`）
-- 另外一种指定输出的 PTX 版本的选项 `--cuda-ptx-version`，但 clang 18.1.3 **不支持**
+- `--cuda-device-only` emits device code (PTX) only
+- `--cuda-feature=+ptx64` enables 64-bit PTX (typically outputs `.address_size 64`)
+- Another option is `--cuda-ptx-version`, but clang 18.1.3 **does not support** it
 
-可以通过查看 PTX 头部确认版本与架构：
+You can verify the PTX header for version and target:
 
 ```bash
 head -n 20 demo.ptx
 ```
 
-通常应看到类似：
+You should typically see:
 
 - `.version 6.4`
 - `.target sm_70`
@@ -102,14 +98,15 @@ head -n 20 demo.ptx
 
 ---
 
-## 2.3 编译 streaming_demo.cu（streams + memcpyAsync + kernel）
+## 2.3 Build streaming_demo.cu (streams + memcpyAsync + kernel)
 
-本 repo 还提供一个更贴近“streaming”使用方式的 CUDA C demo：
+This repo also provides a more “streaming-style” CUDA C demo:
+
 - `cuda/demo/streaming_demo.cu`
 
-它会创建两个 stream，并在各自 stream 上做：H2D -> kernel -> D2H，然后验证结果并输出 `OK`。
+It creates two streams, and on each stream performs H2D → kernel → D2H, then validates results and prints `OK`.
 
-### 2.3.1 编译可执行程序
+### 2.3.1 Build the executable
 
 ```bash
 clang++ streaming_demo.cu -o streaming_demo \
@@ -119,7 +116,7 @@ clang++ streaming_demo.cu -o streaming_demo \
   -I/usr/local/cuda/include
 ```
 
-### 2.3.2 生成 PTX 文件（用于 shim 的 PTX override）
+### 2.3.2 Generate a PTX file (for shim PTX override)
 
 ```bash
 clang++ streaming_demo.cu -S -o streaming_demo.ptx \
@@ -130,14 +127,14 @@ clang++ streaming_demo.cu -S -o streaming_demo.ptx \
   -I/usr/local/cuda/include
 ```
 
-说明：
-- 当前 CUDA Runtime shim 的 fatbin→PTX 提取仍是 MVP 级别（不同工具链可能把 PTX 以 tokenized/encoded 形式放进 fatbin），
-  因此运行这个 demo 时建议用 `GPUSIM_CUDART_SHIM_PTX_OVERRIDE` 显式提供文本 PTX。
-- `-S` 用于强制输出**文本 PTX 汇编**；否则 clang 在某些版本/参数组合下可能把输出当作目标文件或其它中间产物，导致 `*.ptx` 不是可读的 PTX 文本。
+Notes:
 
-### 2.3.3 使用 CUDA Runtime shim 运行（Linux/WSL）
+- The current CUDA Runtime shim’s fatbin→PTX extraction is still MVP-level (different toolchains may embed PTX in tokenized/encoded form inside the fatbin), so it’s recommended to explicitly provide a text PTX via `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`.
+- `-S` forces emission of **text PTX assembly**; otherwise, some clang versions/flag combinations may treat the output as an object file or another intermediate, leading to a `*.ptx` that isn’t readable PTX text.
 
-在仓库根目录先构建 shim（得到 `build/libcudart.so.12`），然后把 shim 放到动态加载器优先路径，并设置 PTX override：
+### 2.3.3 Run via the CUDA Runtime shim (Linux/WSL)
+
+From the repo root, build the shim (producing `build/libcudart.so.12`), put it on the loader’s search path, and set the PTX override:
 
 ```bash
 # repo root
@@ -152,13 +149,13 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
 
 ---
 
-## 3. 在 gpu-sim 上运行 PTX 6.4/sm_70
+## 3. Run PTX 6.4 / sm_70 on gpu-sim
 
-假设已编译出 demo.ptx，且已准备好对应的资产文件：
+Assuming you’ve built `demo.ptx` and prepared the corresponding asset files:
 
-> **注：** `build/gpu-sim-cli` 的编译方法详见 [../../docs/doc_build/build.md](../../docs/doc_build/build.md)。
+> Note: how to build `build/gpu-sim-cli` is documented in [../../docs/doc_build/build.md](../../docs/doc_build/build.md).
 
-建议在**仓库根目录**执行（路径与下面命令一致）：
+It’s recommended to run from the **repo root** (paths below match this assumption):
 
 ```bash
 ./build/gpu-sim-cli \
@@ -173,17 +170,16 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
   --stats out/demo.stats.json
 ```
 
-- `--entry` 指定 kernel 名称（与 demo.cu 保持一致）
-- `--grid`/`--block` 对应 kernel 启动参数（与 host 代码一致）
-- 其余参数请根据实际资产路径调整
+- `--entry` sets the kernel name (keep it consistent with `demo.cu`)
+- `--grid` / `--block` correspond to kernel launch parameters (match the host code)
 
-如果出现 `entry not found` 之类错误，请打开 PTX 文件查找 `.entry ...` 的真实入口名（可能是 C++ name-mangling 形式，例如 `_Z10add_kernelPKjS0_Pjj`），并用该名字替换 `--entry`。
+If you see errors like `entry not found`, open the PTX and find the actual `.entry ...` name (it may be C++ name-mangled, e.g. `_Z10add_kernelPKjS0_Pjj`), and use that value for `--entry`.
 
-### 3.1 关于 `.param`（ld.param）与参数注入
+### 3.1 About `.param` (ld.param) and argument injection
 
-`demo.ptx` 里的 kernel 入口是带参数的（3 个指针 + 1 个 u32）。如果用上面的“单 kernel 模式”直接跑，当前实现**不会**自动注入参数 blob，因此会在第一条 `ld.param.*` 处报错（例如 `E_PARAM_MISS`）。
+The kernel entry in `demo.ptx` takes parameters (3 pointers + 1 u32). If you run it directly in “single kernel mode” as above, the current implementation **does not** automatically inject the parameter blob, so it will fail at the first `ld.param.*` (e.g. `E_PARAM_MISS`).
 
-要让 `add_kernel` 真正执行，需要通过 **workload 模式**为 device buffer 分配内存、做 H2D/D2H copy，并打包 kernel 参数：
+To make `add_kernel` actually execute, use **workload mode** to allocate device buffers, perform H2D/D2H copies, and pack kernel parameters:
 
 ```bash
 ./build/gpu-sim-cli \
@@ -193,26 +189,27 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
   --stats out/demo.stats.json
 ```
 
-说明：
-- workload 文件会分配 3 个 device buffer（A/B/C，各 256 个 u32），并把参数名（例如 `_Z10add_kernelPKjS0_Pjj_param_0`）映射到这些 buffer 的 device pointer。
-- 该 workload 里 A/B 初始是 zeros，因此 C 预期也是 zeros；当前主要用于验证“能跑通参数 + global memory + 控制流”。
+Notes:
 
-仿真输出如无报错，说明 PTX 及资产配置正确。
+- The workload file allocates 3 device buffers (A/B/C, each 256 u32), and maps parameter names (e.g. `_Z10add_kernelPKjS0_Pjj_param_0`) to those buffers’ device pointers.
+- In this workload, A/B are initialized to zeros, so C is expected to be zeros. Today this primarily validates “parameter passing + global memory + control flow can run end-to-end”.
 
----
-
-
-## 4. 常见问题
-
-- clang 18.x 仅支持 CUDA Toolkit ≤ 12.3，13.x 及以上头文件不兼容。
-- 如遇找不到头文件（如 `texture_fetch_functions.h`），请确认 CUDA Toolkit 路径和版本（如 /usr/local/cuda）。
-- 建议全程使用同一版本 clang 和 CUDA，避免混用系统自带 nvcc/clang。
-- 若 gpu-sim 报资产缺失或指令不支持，请补齐对应 JSON 文件。
-- clang 18 某些版本不支持 `--cuda-ptx-version`，如遇报错请移除该参数。
+If the simulation finishes without errors, your PTX and asset configuration is correct.
 
 ---
 
-## 5. 参考
-- [LLVM 官方文档](https://releases.llvm.org/)
+## 4. Common issues
+
+- clang 18.x only supports CUDA Toolkit ≤ 12.3; CUDA 13.x+ headers are incompatible.
+- If headers cannot be found (e.g. `texture_fetch_functions.h`), verify your CUDA Toolkit path/version (e.g. `/usr/local/cuda`).
+- It’s recommended to use a consistent clang + CUDA version pair and avoid mixing with system nvcc/clang.
+- If gpu-sim reports missing assets or unsupported instructions, add/complete the corresponding JSON files.
+- Some clang 18 builds do not support `--cuda-ptx-version`; if you get an error, remove that flag.
+
+---
+
+## 5. References
+
+- [LLVM releases](https://releases.llvm.org/)
 - [NVIDIA CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
-- [Clang CUDA 支持](https://clang.llvm.org/docs/UsersManual.html#cuda)
+- [Clang CUDA support](https://clang.llvm.org/docs/UsersManual.html#cuda)

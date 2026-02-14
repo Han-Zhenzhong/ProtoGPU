@@ -1,12 +1,16 @@
 # src/common/
 
-跨模块契约层（Contracts）。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-内容范围
-- 核心类型：InstRecord、MicroOp、Value、LaneMask、AddrSpace
-- 标识与句柄：kernel/cta/warp/thread/stream/event/cmd 等 ID
-- 统一错误与诊断信息结构
-- 全局配置结构（例如硬件规格、观测配置）
+Cross-module contract layer.
 
-约束
-- 该目录应只包含“通用且无业务依赖”的定义，避免反向依赖其它模块。
+## Scope
+
+- Core types: InstRecord, MicroOp, Value, LaneMask, AddrSpace
+- Identifiers and handles: IDs for kernel/cta/warp/thread/stream/event/cmd, etc.
+- Unified error and diagnostic structures
+- Global config structures (e.g., hardware spec, observability config)
+
+## Constraints
+
+- This directory should only contain definitions that are general-purpose and have no business-logic dependencies, to avoid reverse-dependencies on other modules.

@@ -1,68 +1,75 @@
 # scripts/
 
-脚本入口。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-用途
-- 本地 build/run/test/format 的辅助脚本（Windows 友好）。
+Script entry points.
 
-说明
-- 构建方式与环境要求见构建文档：
-	- [docs/doc_build/build.md](../docs/doc_build/build.md)
-- `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
+## Purpose
 
-## 测试脚本
+- Helper scripts for local build/run/test/format (Windows-friendly).
 
-本目录提供两个入口：
+## Notes
 
-- 单元测试：运行 `gpu-sim-tests` / `ctest`
-- 集成测试：运行 `gpu-sim-cli` 的 demo 路径并校验关键输出/产物
+- Build and environment requirements are documented here:
+  - [docs/doc_build/build.md](../docs/doc_build/build.md)
+- `run_unit_tests.*` / `run_integration_tests.*` will automatically call `scripts/build.*` to configure + build if the `build/` directory or target executables are missing.
 
-在 Linux/WSL 上，集成测试还会尝试跑一个 CUDA Runtime shim 的端到端 demo 回归（如果 `cuda/demo/demo` 可执行且 shim 已构建）：
+## Test scripts
+
+This directory provides two entry points:
+
+- Unit tests: run `gpu-sim-tests` / `ctest`
+- Integration tests: run `gpu-sim-cli` demo paths and validate key outputs/artifacts
+
+On Linux/WSL, integration tests will also try to run an end-to-end CUDA Runtime shim demo regression (if `cuda/demo/demo` exists and the shim has been built):
+
 - `scripts/run_cuda_shim_demo_integration.sh`
 
-如果本机安装了 clang + CUDA Toolkit（能找到 `CUDA_PATH/include/cuda_runtime.h`），集成测试也会尝试：
-- 编译并运行 `cuda/demo/streaming_demo.cu`（通过 shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`）
-- 脚本入口：`scripts/run_cuda_shim_streaming_demo_cu.sh`
+If clang + CUDA Toolkit are installed (i.e. `CUDA_PATH/include/cuda_runtime.h` is found), integration tests will also attempt to:
 
-同时，测试脚本会包含一个 tiny GPT-2 bring-up 的最小端到端回归（CTests）：
+- Build and run `cuda/demo/streaming_demo.cu` (via the shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`)
+- Script entry: `scripts/run_cuda_shim_streaming_demo_cu.sh`
+
+In addition, the test scripts include a minimal end-to-end tiny GPT-2 bring-up regression (CTests):
+
 - `gpu-sim-tiny-gpt2-mincov-tests`
 
-默认约定 build 目录为 `build/`；你也可以传入自定义 build 目录作为第一个参数。
+By default, the build directory is `build/`. You can also pass a custom build directory as the first argument.
 
-### Windows（cmd）
+### Windows (cmd)
 
 ```bat
 scripts\run_unit_tests.bat build
 scripts\run_integration_tests.bat build
 ```
 
-如使用 Visual Studio multi-config，设置环境变量 `CONFIG=Debug|Release`：
+For Visual Studio multi-config generators, set `CONFIG=Debug|Release`:
 
 ```bat
 set CONFIG=Release
 scripts\run_unit_tests.bat build
 ```
 
-### Bash（Git Bash / WSL / Linux / macOS）
+### Bash (Git Bash / WSL / Linux / macOS)
 
 ```bash
 bash scripts/run_unit_tests.sh build
 bash scripts/run_integration_tests.sh build
 ```
 
-同样可用 `CONFIG=Debug|Release` 选择 multi-config 的配置：
+You can also use `CONFIG=Debug|Release` for multi-config:
 
 ```bash
 CONFIG=Release bash scripts/run_integration_tests.sh build
-
 ```
 
-## Tier-0（merge gate）
+## Tier-0 (merge gate)
 
-Tier-0 的唯一 merge gate CTest 名称为：
+The single Tier-0 merge-gate CTest name is:
+
 - `gpu-sim-tiny-gpt2-mincov-tests`
 
-如果你希望只跑 Tier-0：
+To run only Tier-0:
 
 ```bash
 ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"

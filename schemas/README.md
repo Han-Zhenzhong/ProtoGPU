@@ -1,9 +1,12 @@
 # schemas/
 
-> **TODO**: 当前 schema 好像没有在工程里用到。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-- `inst_desc.schema.json`：指令描述 JSON 的 schema（字段约束、枚举、版本、互斥关系等）。
-- `ptx_isa.schema.json`：PTX ISA 映射表的 schema（PTX opcode/type_mod/operand_kinds → ir_op）。
+> **TODO**: These schemas may not currently be wired into the build/runtime.
 
-说明
-- 目前加载 JSON 时主要依赖运行时解析的必填字段访问（缺字段会抛错），尚未把 JSON Schema 校验完整接入到加载流程中。
+- `inst_desc.schema.json`: schema for instruction descriptor JSON (field constraints, enums, versions, mutual exclusivity, etc.)
+- `ptx_isa.schema.json`: schema for the PTX ISA mapping table (PTX `opcode/type_mod/operand_kinds` → `ir_op`)
+
+## Notes
+
+- Today, JSON loading primarily relies on runtime parsing with required-field access (missing fields throw at runtime). Full JSON Schema validation has not yet been fully integrated into the loading pipeline.

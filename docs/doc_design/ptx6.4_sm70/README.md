@@ -1,45 +1,49 @@
-# PTX 6.4 + sm70（功能级）冻结设计（Tier-0: tiny GPT-2 M1–M4）
+# PTX 6.4 + sm70 (functional) frozen design (Tier-0: tiny GPT-2 M1–M4)
 
-本目录给出“可对外交付的冻结基线”在 **设计层** 的落地：
-- PTX 输入口径：PTX 6.4 冻结子集（以 opcode/type_mod/operand_kinds 为匹配键）
-- 硬件口径：sm70 profile（功能级；不追求 cycle-accurate）
-- 质量闸门：tiny GPT-2 bring-up M1–M4 作为 Tier-0（必须持续回归通过）
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-它不是对 repo 全部模块设计文档的替代，而是把“对外承诺”收敛成一套可验证、可扩展且不漂移的冻结接口与边界。
+This directory defines the **design-level** landing of a “deliverable frozen baseline”:
 
-## 入口与依赖
+- PTX input contract: a frozen subset of PTX 6.4 (matching key: `opcode/type_mod/operand_kinds`)
+- Hardware contract: an sm70 profile (functional level; not cycle-accurate)
+- Quality gate: tiny GPT-2 bring-up M1–M4 as Tier‑0 (must continuously pass regression)
 
-- 规划来源：
-  - 完整仿真与对外交付路线：../../doc_plan/plan_design/plan-realPTXSetAndGPUHWSim.prompt.md
-- 规格基线（必须一致）：
-  - PTX 6.4 baseline：../../doc_spec/ptx64_baseline.md
-  - sm70 profile：../../doc_spec/sm70_profile.md
+It is not a replacement for the repo-wide module design docs; it *narrows the external contract* into a frozen set of verifiable, extensible, non-drifting interfaces and boundaries.
 
-- 模块化设计文档（本目录在这些文档之上“收敛冻结口径”）：
-  - Frontend：../modules/02_frontend.md
-  - Instruction System：../modules/03_instruction_system.md
-  - SIMT Core：../modules/06_simt_core.md
-  - Units：../modules/05_units.md
-  - Memory：../modules/04_memory.md
-  - Observability：../modules/01_observability.md
-  - Contracts：../modules/00_contracts.md
+## Entry points and dependencies
 
-## 本目录文档
+- Planning source:
+  - Full simulation and delivery roadmap: ../../doc_plan/plan_design/plan-realPTXSetAndGPUHWSim.prompt.md
 
-- 00_scope_and_quality_gate.md：范围、Tier-0 质量闸门、验收命令
-- 01_ptx64_frontend_and_mapping.md：PTX6.4 tokenization 子集、映射键冻结、label→pc、%f 与 0f 立即数
-- 02_instruction_semantics_and_uops.md：IR op 约定、inst_desc/expander 契约、fail-fast
-- 03_simt_predication_and_controlflow.md：predication guard、uniform-only 分支、next_pc 提交
-- 04_memory_no_cache_addrspace.md：no_cache_addrspace 可观察边界与错误策略
-- 05_observability_and_output_contract.md：diag/trace/stats 的格式契约与版本化建议
-- 06_public_api_and_assets_packaging.md：对外 API 形态与“in-memory assets”加载策略
+- Spec baselines (must stay consistent):
+  - PTX 6.4 baseline: ../../doc_spec/ptx64_baseline.md
+  - sm70 profile: ../../doc_spec/sm70_profile.md
 
-## 设计原则（冻结）
+- Modular design docs (this directory “converges the frozen contract” on top of these):
+  - Frontend: ../modules/02_frontend.md
+  - Instruction System: ../modules/03_instruction_system.md
+  - SIMT Core: ../modules/06_simt_core.md
+  - Units: ../modules/05_units.md
+  - Memory: ../modules/04_memory.md
+  - Observability: ../modules/01_observability.md
+  - Contracts: ../modules/00_contracts.md
 
-- 匹配键冻结：`ptx_opcode + type_mod + operand_kinds`；bring-up 阶段 `space/flags` 不参与匹配。
-- fail-fast：unknown form / unknown uop / divergence / 越界访存等必须返回可定位 Diagnostic，禁止 silent fallback。
-- 最小可回归：每新增一个 PTX form，必须同时补齐：
-  1) `assets/ptx_isa/*.json` entry
-  2) `assets/inst_desc/*.json` 语义
-  3) fixture PTX
-  4) CTest（或纳入现有 Tier-0）
+## Documents in this directory
+
+- 00_scope_and_quality_gate.md: scope, Tier‑0 quality gate, validation commands
+- 01_ptx64_frontend_and_mapping.md: PTX 6.4 tokenization subset, frozen mapping keys, label→pc, `%f` and `0f` immediates
+- 02_instruction_semantics_and_uops.md: IR op conventions, inst_desc/expander contract, fail-fast
+- 03_simt_predication_and_controlflow.md: predication guards, uniform-only branches, next_pc commit
+- 04_memory_no_cache_addrspace.md: no_cache_addrspace observable boundaries and error policy
+- 05_observability_and_output_contract.md: diag/trace/stats format contract and versioning suggestions
+- 06_public_api_and_assets_packaging.md: external API shape and “in-memory assets” loading strategy
+
+## Design principles (frozen)
+
+- Frozen match key: `ptx_opcode + type_mod + operand_kinds`; during bring-up, `space/flags` do not participate in matching.
+- Fail-fast: unknown form / unknown µop / divergence / out-of-bounds memory access must return a locatable Diagnostic; silent fallback is forbidden.
+- Minimum regressive coverage: each new PTX form must include:
+  1) an `assets/ptx_isa/*.json` entry
+  2) semantics in `assets/inst_desc/*.json`
+  3) a fixture PTX
+  4) a CTest (or inclusion into existing Tier‑0)

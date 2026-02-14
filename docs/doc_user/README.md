@@ -1,12 +1,15 @@
-# User Docs（使用者文档）
+# User Docs
 
-本目录面向使用者，说明如何构建与运行 `gpu-sim-cli`，以及如何使用新引入的 Kernel I/O + ABI（数据输入/参数输入/结果输出）能力。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-文档索引
-- [CLI 使用说明](cli.md)
-- [Public Runtime API（C++：in-memory PTX + in-memory JSON assets）](public_api.md)
-- [多 SM 并行执行（每 SM 一个宿主线程）](sm_parallel_execution.md)
-- [模块化 HW/SW Mapping（架构 profile 与可替换组件）](modular_hw_sw_mapping.md)
-- [Kernel I/O + ABI：数据输入/参数输入/结果输出](kernel_io_and_abi.md)
-- [tiny GPT-2 最小覆盖（M1–M4）](tiny_gpt2_minimal_coverage.md)
-- [scripts/（测试脚本）](scripts.md)
+This directory is user-facing. It explains how to build and run `gpu-sim-cli`, and how to use the Kernel I/O + ABI capability (data input / parameter input / result output).
+
+## Index
+
+- [CLI usage](cli.md)
+- [Public Runtime API (C++: in-memory PTX + in-memory JSON assets)](public_api.md)
+- [Multi-SM parallel execution (one host thread per SM)](sm_parallel_execution.md)
+- [Modular HW/SW mapping (architecture profiles and swappable components)](modular_hw_sw_mapping.md)
+- [Kernel I/O + ABI: data input / parameter input / result output](kernel_io_and_abi.md)
+- [tiny GPT-2 minimal coverage (M1–M4)](tiny_gpt2_minimal_coverage.md)
+- [scripts/ (test scripts)](scripts.md)

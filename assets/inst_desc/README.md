@@ -1,16 +1,21 @@
 # assets/inst_desc/
 
-指令描述 JSON 数据集。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-用途
-- Inst Descriptor Registry 的输入
-- 可用于功能/回归测试覆盖（与 tests/fixtures/inst_desc 区分：这里偏默认数据集）
+Instruction descriptor JSON dataset.
 
-说明（descriptor-driven decode 之后的推荐分层）
-- 若要支持“用户选择 PTX8 指令集，只关心 PTX op → 通用 IR op，不关心 uops 组合”，建议将描述数据拆成两层：
-	- PTX ISA 映射：`ptx_opcode/type_mod/operand_kinds -> ir_op`
-	- IR 语义库：`ir_op (+operand_kinds) -> uops[]`
-- 本目录可继续承载默认数据集；具体分层文件名与目录约定以 dev doc 为准。
+## Usage
 
-约束
-- JSON 必须通过 `schemas/inst_desc.schema.json` 校验。
+- Input to the Inst Descriptor Registry
+- Can be used for functional/regression coverage (distinct from `tests/fixtures/inst_desc`: this folder is intended to be the default dataset)
+
+## Notes (recommended layering after descriptor-driven decode)
+
+- If you want to support “user selects PTX8 ISA and only cares about PTX op → generic IR op, not about µop composition”, it’s recommended to split the description data into two layers:
+  - PTX ISA mapping: `ptx_opcode/type_mod/operand_kinds -> ir_op`
+  - IR semantics library: `ir_op (+operand_kinds) -> uops[]`
+- This directory can continue to host the default dataset; exact filenames and directory conventions should follow the dev docs.
+
+## Constraints
+
+- JSON must validate against `schemas/inst_desc.schema.json`.

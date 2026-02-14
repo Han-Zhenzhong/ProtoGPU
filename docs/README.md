@@ -1,51 +1,53 @@
-# Docs（文档索引）
+# Docs
 
-本目录承载 `gpu-sim` 的所有文档。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-## 快速入口
+This directory contains all documentation for `gpu-sim`.
 
-- 使用者文档（怎么跑/怎么配）
+## Quick links
+
+- User docs (how to run / how to configure)
   - [doc_user/README.md](doc_user/README.md)
-- 构建文档（怎么编译）
+- Build docs (how to compile)
   - [doc_build/README.md](doc_build/README.md)
   - [doc_build/build.md](doc_build/build.md)
 
-## 设计与实现
+## Design and implementation
 
-- 抽象设计（模块职责、语义与流程契约）
+- Abstract design (module responsibilities, semantics, and flow contracts)
   - [doc_design/README.md](doc_design/README.md)
-  - 总览（架构设计）：[doc_design/arch_design.md](doc_design/arch_design.md)
+  - Overview (architecture design): [doc_design/arch_design.md](doc_design/arch_design.md)
 
-- 实现级设计（指导代码开发的落点：类型/接口/目录/错误/配置/trace）
+- Implementation-level design (guidance for coding: types/interfaces/dirs/errors/config/trace)
   - [doc_dev/README.md](doc_dev/README.md)
 
-## 规格与 Schema
+## Specs and schemas
 
-- 规格/图（PUML 等）
+- Specs / diagrams (PUML, etc.)
   - [doc_spec/README.md](doc_spec/README.md)
 
-- JSON schemas（inst_desc / ptx_isa / workload）
+- JSON schemas (inst_desc / ptx_isa / workload)
   - [../schemas/README.md](../schemas/README.md)
 
-## 测试与计划
+## Tests and plans
 
-- 测试文档
+- Test docs
   - [doc_tests/README.md](doc_tests/README.md)
 
-- 计划文档（roadmap / 设计计划 / 开发计划 / 测试计划）
+- Planning docs (roadmap / design plan / dev plan / test plan)
   - [doc_plan/overall_plan.md](doc_plan/overall_plan.md)
 
-## 相关目录
+## Related directories
 
-- scripts（构建/单测/集成测试脚本）
+- scripts (build/unit/integration test scripts)
   - [../scripts/README.md](../scripts/README.md)
 
-- tools（生成器/trace viewer 等）
+- tools (generators / trace viewer, etc.)
   - [../tools/README.md](../tools/README.md)
 
 ---
 
-### 约定
+## Conventions
 
-- 文档之间以相对路径互链，默认从仓库根目录打开也可正常跳转。
-- 若文本与 PUML 图冲突，以图为准（见各 doc_* README 的说明）。
+- Docs cross-link using relative paths, and links should work even when opened from the repo root.
+- If text conflicts with PUML diagrams, diagrams win (see each doc_* README for details).

@@ -1,26 +1,32 @@
-# Dev Docs（实现级设计）
+# Dev Docs (implementation-level design)
 
-说明
-- 本目录承载“指导代码开发”的实现级设计：目录与模块边界、接口落地、数据结构落地、配置与观测落地、错误处理与诊断规范。
-- 设计基准：所有模块边界与依赖方向以 PUML 为准（尤其是 `doc_design/arch_modules_block.diagram.puml` 与 `doc_design/sequence.diagram.puml`）；若与文字冲突，以图为准。
-- 指令描述文件格式固定为 JSON。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-与抽象设计的关系
-- 抽象逻辑设计在 `doc_design/`：模块职责、语义与流程契约。
-- 实现级设计在 `doc_dev/`：落地的类型定义位置、API 形态、目录与文件组织、错误与诊断对外形态、配置与 trace 输出格式。
+## Notes
 
-代码目录对齐
-- `src/common/`：Contracts（核心类型、诊断、事件、配置与序列化）。
-- `src/observability/`：ObsControl、TraceBuffer、Counters。
-- `src/instruction/`：DescriptorRegistry（JSON+schema 校验）与 MicroOpExpander。
-- `src/frontend/`：Parser/Binder/ModuleBuilder。
-- `src/memory/`：AddrSpaceManager 与各地址空间实现。
-- `src/units/`：ExecCore/ControlUnit/MemUnit。
-- `src/simt/`：Contexts/Schedulers/Executor。
-- `src/runtime/`：Runtime/Streams/Queues/DependencyTracker。
-- `src/apps/cli/`：端到端入口（输入 PTX/descriptor/config，输出 trace/stats）。
+- This directory contains implementation-level design that *guides code development*: directory/module boundaries, API landing points, data structure landing points, config/observability landing points, error handling and diagnostics conventions.
+- Design baseline: module boundaries and dependency directions follow the PUML diagrams (especially `doc_design/arch_modules_block.diagram.puml` and `doc_design/sequence.diagram.puml`). If text conflicts with diagrams, diagrams win.
+- Instruction descriptor file format is fixed to JSON.
 
-实现顺序（依赖顺序）
+## Relationship to abstract design
+
+- Abstract logic design lives in `doc_design/`: module responsibilities, semantics, and flow contracts.
+- Implementation-level design lives in `doc_dev/`: where types live, API shape, directory/file organization, external error/diagnostic shape, config and trace output formats.
+
+## Code directory alignment
+
+- `src/common/`: Contracts (core types, diagnostics, events, configs, serialization)
+- `src/observability/`: ObsControl, TraceBuffer, Counters
+- `src/instruction/`: DescriptorRegistry (JSON + schema validation) and MicroOpExpander
+- `src/frontend/`: Parser / Binder / ModuleBuilder
+- `src/memory/`: AddrSpaceManager and address space implementations
+- `src/units/`: ExecCore / ControlUnit / MemUnit
+- `src/simt/`: Contexts / Schedulers / Executor
+- `src/runtime/`: Runtime / Streams / Queues / DependencyTracker
+- `src/apps/cli/`: end-to-end entry (input PTX/descriptor/config, output trace/stats)
+
+## Implementation order (dependency order)
+
 1) Contracts
 2) Observability
 3) Instruction System
@@ -30,20 +36,23 @@
 7) SIMT Core
 8) Runtime + Streaming
 9) Engines
-10) Kernel I/O + ABI（跨 Runtime/Engines/Memory）
+10) Kernel I/O + ABI (spans Runtime/Engines/Memory)
 
-配置与输入输出约定
-- 运行配置：JSON 文件（路径由 CLI 参数提供）。
-- 指令描述：JSON 文件（路径由 CLI 参数提供）。
-- 指令描述 schema：放在 `schemas/`（详见 03 Instruction System dev doc）。
-- Trace：JSON lines（每行一个 Event JSON 对象）。
-- Stats：JSON（Counters snapshot）。
+## Config and I/O conventions
 
-错误与诊断约定
-- 对外错误统一为 `Diagnostic`（module/code/message/location/inst_index）。
-- 任何错误必须可定位到：源文件位置（file/line/column）或 inst_index（至少其一）。
+- Runtime config: JSON file (path provided via CLI)
+- Instruction descriptors: JSON file (path provided via CLI)
+- Instruction descriptor schema: under `schemas/` (see Instruction System dev doc)
+- Trace: JSON Lines (one Event JSON object per line)
+- Stats: JSON (Counters snapshot)
 
-文档索引（按模块）
+## Error and diagnostics conventions
+
+- External errors are unified as `Diagnostic` (module/code/message/location/inst_index)
+- Any error must be locatable to: source location (file/line/column) or `inst_index` (at least one)
+
+## Index (by module)
+
 - `doc_dev/modules/00_contracts.md`
 - `doc_dev/modules/01_observability.md`
 - `doc_dev/modules/02_frontend.md`

@@ -1,7 +1,9 @@
 # tests/fixtures/
 
-测试输入与配置。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-- `ptx/`：测试专用 PTX 输入
-- `inst_desc/`：测试专用 descriptor JSON（用于覆盖边界条件/错误场景）
-- `configs/`：测试运行配置（硬件规格、观测开关、严格检查策略等）
+Test inputs and configurations.
+
+- `ptx/`: test-only PTX inputs
+- `inst_desc/`: test-only descriptor JSON (used to cover edge cases / error scenarios)
+- `configs/`: test run configs (hardware spec, observability toggles, strict-check policies, etc.)
