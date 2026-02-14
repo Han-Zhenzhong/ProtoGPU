@@ -1,102 +1,109 @@
-# 如何编译（CMake Build Guide）
+# How to build (CMake Build Guide)
 
-本仓库使用 CMake 构建（见根目录 `CMakeLists.txt`）。核心产物是：
+> Chinese version: [build.zh-CN.md](build.zh-CN.md)
 
-- `gpusim_core`：核心库（静态/动态由生成器/平台决定）
-- `gpu-sim-cli`：命令行可执行程序（链接 `gpusim_core`）
+This repository uses CMake (see the repo-root `CMakeLists.txt`). The main build artifacts are:
 
-项目要求：
+- `gpusim_core`: core library (static/shared depends on generator/platform)
+- `gpu-sim-cli`: command-line executable (links `gpusim_core`)
+
+Requirements:
 
 - CMake `>= 3.20`
-- 支持 C++17 的编译器（`CMAKE_CXX_STANDARD 17`）
-- 目前没有显式的第三方依赖（代码只用到标准库）
+- A C++17-capable compiler (`CMAKE_CXX_STANDARD 17`)
+- No explicit third-party dependencies currently (standard library only)
 
-## 推荐的构建方式（Out-of-source）
+## Recommended build (out-of-source)
 
-统一约定：在仓库根目录执行以下命令。
+Convention: run the following commands from the repo root.
 
-### Windows（MSVC / Visual Studio 2022，Multi-config）
+### Windows (MSVC / Visual Studio 2022, multi-config)
 
-1) 安装 Visual Studio 2022（工作负载：Desktop development with C++），确保包含：
+1) Install Visual Studio 2022 (workload: Desktop development with C++) and ensure you have:
+
 - MSVC toolset
 - Windows SDK
-- CMake tools（可选，但推荐）
+- CMake tools (optional, recommended)
 
-2) 生成与编译：
+2) Configure and build:
 
 ```bat
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-3) 产物位置（常见）：
+3) Typical artifact location:
+
 - `build/Release/gpu-sim-cli.exe`
 
-调试构建：
+Debug build:
 
 ```bat
 cmake --build build --config Debug
 ```
 
-### Windows / Linux / macOS（Ninja，Single-config）
+### Windows / Linux / macOS (Ninja, single-config)
 
-如果你安装了 Ninja（推荐），使用单配置生成器通常更快：
+If you have Ninja installed (recommended), single-config builds are typically faster:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-产物位置（常见）：
-- Windows：`build/gpu-sim-cli.exe`
-- Linux/macOS：`build/gpu-sim-cli`
+Typical artifact locations:
 
-调试构建：
+- Windows: `build/gpu-sim-cli.exe`
+- Linux/macOS: `build/gpu-sim-cli`
+
+Debug build:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-### Linux / macOS（Unix Makefiles）
+### Linux / macOS (Unix Makefiles)
 
 ```bash
 cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-## 运行与目录约定
+## Running and directory conventions
 
-`gpu-sim-cli` 默认参数使用仓库内的相对路径资源：
+`gpu-sim-cli` defaults to repo-relative inputs:
 
-- PTX：`assets/ptx/demo_kernel.ptx`
-- PTX ISA map：`assets/ptx_isa/demo_ptx64.json`
-- 指令描述：`assets/inst_desc/demo_desc.json`
-- 配置：`assets/configs/demo_config.json`
+- PTX: `assets/ptx/demo_kernel.ptx`
+- PTX ISA map: `assets/ptx_isa/demo_ptx64.json`
+- Instruction descriptor: `assets/inst_desc/demo_desc.json`
+- Config: `assets/configs/demo_config.json`
 
-因此建议在“仓库根目录”运行程序；或者显式传入 `--ptx/--ptx-isa/--inst-desc/--config` 的完整路径。
+So it’s recommended to run from the **repo root**, or pass full paths via `--ptx/--ptx-isa/--inst-desc/--config`.
 
-说明
-- `scripts/run_unit_tests.*` / `scripts/run_integration_tests.*` 会自动切到仓库根目录执行，并在 build 目录或可执行文件缺失时自动 build。
+Notes
 
-### 运行示例
+- `scripts/run_unit_tests.*` / `scripts/run_integration_tests.*` automatically `cd` to the repo root and will auto-build if the build dir or executables are missing.
 
-（从仓库根目录）
+### Example run
+
+(from the repo root)
 
 ```bash
 ./build/gpu-sim-cli --help
 ```
 
-不传参数会使用默认输入，并写出到：
+With no args, it uses defaults and writes:
 
-- trace：`out/trace.jsonl`
-- stats：`out/stats.json`
+- trace: `out/trace.jsonl`
+- stats: `out/stats.json`
 
-说明（输出契约 v1 基线）
-- `trace.jsonl` 第 1 行会写入 `TRACE_HEADER`（包含 `format_version/schema/profile/deterministic`）。
-- `stats.json` 顶层也会包含 `format_version/schema/profile/deterministic`（以及 `counters`）。
+Output contract notes (v1 baseline)
 
-你也可以指定输出路径：
+- Line 1 of `trace.jsonl` is `TRACE_HEADER` (includes `format_version/schema/profile/deterministic`).
+- Top-level fields in `stats.json` include `format_version/schema/profile/deterministic` (and `counters`).
+
+You can also specify output paths:
 
 ```bash
 ./build/gpu-sim-cli \
@@ -110,47 +117,51 @@ cmake --build build -j
 
 ---
 
-## Tier‑0（唯一 merge gate）快速回归
+## Tier‑0 (single merge gate) quick regression
 
-Tier‑0 的 CTest 名称：`gpu-sim-tiny-gpt2-mincov-tests`
+Tier‑0 CTest name: `gpu-sim-tiny-gpt2-mincov-tests`
 
-只跑 Tier‑0：
+Run only Tier‑0:
 
 ```bash
 ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 ```
 
-或使用脚本入口（会在缺少 build 产物时先自动构建）：
+Or via scripts (auto-builds if missing artifacts):
 
-- Windows：`scripts\run_unit_tests.bat build`
-- Bash：`bash scripts/run_unit_tests.sh build`
+- Windows: `scripts\run_unit_tests.bat build`
+- Bash: `bash scripts/run_unit_tests.sh build`
 
-补充：本仓库也提供一些更 targeted 的回归用例（同样会被 `run_unit_tests.*` 默认包含）：
+The repo also includes more targeted regressions (also included by default in `run_unit_tests.*`):
+
 - `gpu-sim-inst-desc-tests`
 - `gpu-sim-simt-tests`
-- `gpu-sim-memory-tests`（memory.model / addrspace 路径与诊断码锁定回归）
-- `gpu-sim-public-api-tests`（public Runtime API：in-memory PTX + in-memory JSON assets 回归）
+- `gpu-sim-memory-tests` (memory.model / addrspace paths and diagnostic-code lock-in)
+- `gpu-sim-public-api-tests` (public Runtime API: in-memory PTX + in-memory JSON assets regression)
 
-其中 `gpu-sim-public-api-tests` 是一个“打包/嵌入友好”的回归：它不依赖仓库的 `assets/` 路径，直接用 in-memory PTX 与 in-memory JSON assets 验证 public API。
+`gpu-sim-public-api-tests` is packaging/embedding friendly: it does not rely on `assets/` file paths, and instead validates the public API with in-memory PTX and in-memory JSON assets.
 
-对应的用户侧说明见：
+User-facing reference:
+
 - `docs/doc_user/public_api.md`
 
 ---
 
-## 多 SM 并行执行（06.02）
+## Multi-SM parallel execution (06.02)
 
-本项目支持“每个 SM 一个宿主线程”的并行执行基线（见用户文档 [docs/doc_user/sm_parallel_execution.md](../doc_user/sm_parallel_execution.md)）。
+This project supports a baseline “one host thread per SM” parallel execution mode (see user doc: [../doc_user/sm_parallel_execution.md](../doc_user/sm_parallel_execution.md)).
 
-启用方式：在 config 的 `sim` 节点中设置：
-- `sim.sm_count`：SM worker 数（>1 才有意义）
-- `sim.parallel`：是否启用并行 worker
-- `sim.deterministic`：确定性回归模式（当前基线：为 true 时会禁用并行）
+Enable it via the config `sim` section:
 
-仓库内提供了一个并行示例配置：
+- `sim.sm_count`: number of SM workers (>1 to matter)
+- `sim.parallel`: enable parallel workers
+- `sim.deterministic`: deterministic regression mode (baseline: when true, parallel is disabled)
+
+A parallel example config is provided:
+
 - `assets/configs/demo_parallel_config.json`
 
-运行示例（从仓库根目录）：
+Example run (from repo root):
 
 ```bash
 ./build/gpu-sim-cli \
@@ -162,36 +173,37 @@ ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 
 ---
 
-## 模块化架构选择（10：HW/SW Mapping）
+## Modular architecture selection (10: HW/SW mapping)
 
-本项目支持通过配置文件选择“可替换模块/策略”，用于把不同的软件实现组合成一个目标架构（见设计/实现文档：
+You can select swappable modules/strategies via the config file to compose a target architecture (see design/implementation docs:
+
 - `docs/doc_design/modules/10_modular_hw_sw_mapping.md`
 - `docs/doc_dev/modules/10_modular_hw_sw_mapping.md`
-）
 
-### 配置入口（Selectors / Profile）
+### Config entry points (selectors / profile)
 
-目前支持以下选择入口（保持向后兼容）：
+Currently supported selector entry points (kept for backward compatibility):
 
-- `sim.cta_scheduler`：CTA 分发策略（默认 `fifo`）
-- `sim.warp_scheduler`：warp issue 策略（默认 `in_order_run_to_completion`）
-- `memory.model`：内存模型选择器（默认 `no_cache_addrspace`）
-- `sim.allow_unknown_selectors`：unknown selector 是否允许（默认 `false`，即默认严格模式）
+- `sim.cta_scheduler`: CTA distribution policy (default `fifo`)
+- `sim.warp_scheduler`: warp issue policy (default `in_order_run_to_completion`)
+- `memory.model`: memory model selector (default `no_cache_addrspace`)
+- `sim.allow_unknown_selectors`: whether unknown selectors are allowed (default `false`, i.e. strict by default)
 
-更推荐的写法是使用：
+The preferred style is:
 
-- `arch.profile`：架构 profile 名称（当前提供 `baseline_no_cache`）
-- `arch.components`：组件选择覆盖（优先级高于 `sim.*` selectors）
+- `arch.profile`: architecture profile name (currently `baseline_no_cache`)
+- `arch.components`: component override map (takes priority over `sim.*` selectors)
 
-仓库内提供了一个演示配置：
+A demo config is provided:
+
 - `assets/configs/demo_modular_selectors.json`
-  - 启用 2 个 SM 并行
+  - enables 2-SM parallel
   - `cta_scheduler=sm_round_robin`
   - `warp_scheduler=round_robin_interleave_step`
 
-### 运行示例
+### Example run
 
-（从仓库根目录，Ninja/Unix Makefiles）
+(from repo root, Ninja/Unix Makefiles)
 
 ```bash
 ./build/gpu-sim-cli \
@@ -205,48 +217,51 @@ ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
   --stats out/modsel.stats.json
 ```
 
-（Visual Studio multi-config）
+(Visual Studio multi-config)
 
 ```bat
 build\Release\gpu-sim-cli.exe --config assets\configs\demo_modular_selectors.json --grid 4,1,1 --block 32,1,1
 ```
 
-### 如何确认“选择生效”（Trace）
+### How to confirm selectors took effect (trace)
 
-trace 中会出现一次性的 `RUN_START` 事件，`extra` 字段携带 config_summary（profile/components/sm_count/parallel/deterministic）。
+The trace includes a one-time `RUN_START` event. Its `extra` field carries a config_summary (profile/components/sm_count/parallel/deterministic).
 
-你可以用 scripts 的集成测试做最小验证（见 `docs/doc_user/scripts.md`）：
+For minimal verification, you can use the integration-test scripts (see `docs/doc_user/scripts.md`).
 
-- Windows：`scripts\run_integration_tests.bat build`
-- Bash：`bash scripts/run_integration_tests.sh build`
+- Windows: `scripts\run_integration_tests.bat build`
+- Bash: `bash scripts/run_integration_tests.sh build`
 
-其中会检查：
-- trace 含 `"action":"RUN_START"`
-- modular selectors trace 中能观察到 `sm_round_robin` 与 `round_robin_interleave_step`
+The scripts validate:
 
-## 3D Kernel Launch（grid/block）
+- trace contains `"action":"RUN_START"`
+- the modular selector strings (e.g. `sm_round_robin` and `round_robin_interleave_step`) are observable in the trace
 
-`gpu-sim-cli` 支持以 3D `grid_dim` / `block_dim` 形式启动 kernel（对齐 `doc_design/modules/06.01_launch_grid_block_3d.md` 的抽象语义）。
+## 3D kernel launch (grid/block)
 
-CLI 参数
-- `--grid x,y,z`：gridDim（三维 CTA 数）
-- `--block x,y,z`：blockDim（三维 thread 维度）
+`gpu-sim-cli` supports launching kernels with 3D `grid_dim` / `block_dim` (aligned with the abstract semantics in `doc_design/modules/06.01_launch_grid_block_3d.md`).
 
-默认值
-- `--grid` 默认 `1,1,1`
-- `--block` 默认 `<warp_size>,1,1`（warp_size 来自 config 中 `sim.warp_size`）
+CLI flags
 
-运行示例（从仓库根目录）
+- `--grid x,y,z`: gridDim (3D CTA counts)
+- `--block x,y,z`: blockDim (3D thread dimensions)
+
+Defaults
+
+- `--grid` defaults to `1,1,1`
+- `--block` defaults to `<warp_size>,1,1` (warp_size comes from `sim.warp_size` in config)
+
+Example run (from repo root)
 
 ```bash
 ./build/gpu-sim-cli --ptx assets/ptx/demo_kernel.ptx --grid 2,1,1 --block 32,1,1
 ```
 
-## SIMT 分歧演示（M5）
+## SIMT divergence demo (M5)
 
-仓库提供了一个最小的 divergent `bra` 示例 PTX：`assets/ptx/demo_divergence.ptx`。
+The repo provides a minimal divergent `bra` example PTX: `assets/ptx/demo_divergence.ptx`.
 
-运行示例
+Example run
 
 ```bash
 ./build/gpu-sim-cli \
@@ -259,24 +274,28 @@ CLI 参数
   --stats out/diverge.stats.json
 ```
 
-验证方式
-- 在 trace 中搜索 `SIMT_SPLIT`（表示发生了 warp 内分歧拆分）。
+How to validate
 
-说明
-- 当前 demo PTX 是否“实际使用 builtin（例如 `%tid.x`）”取决于你传入的 PTX 文件与 ISA/inst_desc 资产；launch 维度会贯穿 SIMT 侧上下文（CTA/warp/lane）。
-- `block_dim.x * block_dim.y * block_dim.z` 不是 warp_size 的整数倍时，最后一个 warp 会是部分 warp（`active_mask` 会关闭无效 lanes）。
+- Search for `SIMT_SPLIT` in the trace (indicates warp divergence split occurred).
+
+Notes
+
+- Whether the demo PTX “actually reads builtins (e.g. `%tid.x`)” depends on the PTX file and ISA/inst_desc assets you provide; launch dimensions flow through SIMT contexts (CTA/warp/lane).
+- If `block_dim.x * block_dim.y * block_dim.z` is not a multiple of warp_size, the last warp is partial (inactive lanes are masked off).
 
 ---
 
-## WorkloadSpec（streams/commands：--workload）
+## WorkloadSpec (streams/commands: `--workload`)
 
-`gpu-sim-cli` 支持一个“可重放的 workload 输入文件”（WorkloadSpec JSON），用来描述：
-- buffers（host/device）
-- modules（ptx + ptx_isa + inst_desc 绑定）
-- streams（每 stream FIFO commands）
-- event_record / event_wait（跨 stream 依赖）
+`gpu-sim-cli` supports a replayable workload input file (WorkloadSpec JSON) that describes:
 
-该模式与抽象/实现设计对齐：
+- buffers (host/device)
+- modules (bind ptx + ptx_isa + inst_desc)
+- streams (per-stream FIFO commands)
+- `event_record` / `event_wait` (cross-stream dependencies)
+
+This aligns with the abstract/implementation design:
+
 - `doc_design/modules/07_runtime_streaming.md`
 - `doc_design/modules/07.01_stream_input_workload_spec.md`
 - `doc_dev/modules/07_runtime_streaming.md`
@@ -284,13 +303,14 @@ CLI 参数
 
 ### Demo workloads
 
-仓库内提供两个最小 smoke workload：
+Two minimal smoke workloads are included:
+
 - `assets/workloads/smoke_single_stream.json`
 - `assets/workloads/smoke_two_stream_event.json`
 
-### 运行示例
+### Example run
 
-（从仓库根目录）
+(from the repo root)
 
 ```bash
 ./build/gpu-sim-cli \
@@ -300,78 +320,81 @@ CLI 参数
   --stats out/workload.stats.json
 ```
 
-说明
-- `--workload` 模式与单-kernel参数（`--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`）互斥。
-- trace 里会新增 `STREAM` 类别事件（例如 `cmd_enq/cmd_ready/cmd_submit/cmd_complete`），并携带 `cmd_id/stream_id`（event 相关命令额外携带 `event_id`）。
+Notes
+
+- Workload mode is mutually exclusive with single-kernel flags (`--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`).
+- Trace includes additional STREAM-category events (e.g. `cmd_enq/cmd_ready/cmd_submit/cmd_complete`) carrying `cmd_id/stream_id` (event-related commands also carry `event_id`).
 
 ---
 
-## Kernel I/O + ABI（数据输入/参数输入/结果输出）演示
+## Kernel I/O + ABI demo (data input / param input / result output)
 
-仓库新增了一个最小端到端演示路径，用来验证：
-- kernel `.param` 参数输入（`ld.param`）
-- kernel 将结果写入 global memory（`st.global`）
-- host 侧显式 D2H 回读作为“执行结果输出”
+The repo includes a minimal end-to-end demo path to validate:
 
-### 构建后运行（Ninja/Unix Makefiles）
+- kernel `.param` argument input (`ld.param`)
+- kernel writes results to global memory (`st.global`)
+- host explicitly reads back via D2H as “result output”
 
-从仓库根目录：
+### Run after building (Ninja/Unix Makefiles)
+
+From the repo root:
 
 ```bash
 ./build/gpu-sim-cli --ptx assets/ptx/write_out.ptx --io-demo
 ```
 
-预期：终端打印一行 `io-demo u32 result: 42`，同时照常输出 trace/stats（默认到 `out/`）。
+Expected: the console prints `io-demo u32 result: 42`, and trace/stats are produced as usual (default under `out/`).
 
-### 构建后运行（Visual Studio multi-config）
+### Run after building (Visual Studio multi-config)
 
 ```bat
 build\Release\gpu-sim-cli.exe --ptx assets\ptx\write_out.ptx --io-demo
 ```
 
-### 说明与限制（当前实现）
+### Notes and limitations (current implementation)
 
-- `--io-demo` 假设 kernel 形参包含一个 `.param .u64 out_ptr`，并向该地址写入一个 `u32`。
-- `.param` 读取目前按“参数名 symbol”绑定（例如 `[out_ptr]`），支持 `.u32/.u64` 两类参数。
-- global memory 读写为 no-cache 的最小模型，主要用于 bring-up/回归；更完整的 streaming/engines 模型仍在演进。
+- `--io-demo` assumes the kernel has a `.param .u64 out_ptr` parameter and writes a `u32` to that address.
+- `.param` reads are currently bound by “parameter name symbol” (e.g. `[out_ptr]`), supporting `.u32` and `.u64` parameters.
+- Global memory uses the minimal no-cache model primarily for bring-up/regression; a more complete streaming/engines model is still evolving.
 
-## 常见问题（Troubleshooting）
+## Troubleshooting
 
-- `CMAKE_BUILD_TYPE` 不生效：
-  - Visual Studio/Xcode 属于 multi-config 生成器，使用 `cmake --build ... --config Release` 选择配置。
-  - Ninja/Makefiles 属于 single-config，使用 `-DCMAKE_BUILD_TYPE=Release|Debug`。
+- `CMAKE_BUILD_TYPE` has no effect:
+  - Visual Studio/Xcode are multi-config generators; use `cmake --build ... --config Release`.
+  - Ninja/Makefiles are single-config; use `-DCMAKE_BUILD_TYPE=Release|Debug`.
 
-- 找不到编译器 / 生成器：
-  - Windows + MSVC：用“x64 Native Tools Command Prompt for VS 2022”打开终端再运行 CMake。
-  - Ninja：确认 `ninja` 在 PATH 中（或安装 VS 自带 Ninja / 独立 Ninja）。
+- Compiler/generator not found:
+  - Windows + MSVC: open a terminal via “x64 Native Tools Command Prompt for VS 2022”, then run CMake.
+  - Ninja: ensure `ninja` is on PATH (or install VS-bundled Ninja / standalone Ninja).
 
-- 运行时报找不到资源文件（PTX/JSON）：
-  - 确认当前工作目录在仓库根目录；或用 `--ptx/--desc/--config` 指定正确路径。
+- Runtime cannot find resource files (PTX/JSON):
+  - Ensure your working directory is the repo root, or pass correct paths via `--ptx/--desc/--config`.
 
-## 构建系统细节（与代码一致的事实）
+## Build system details (facts aligned with code)
 
-- 根目录 `CMakeLists.txt` 里声明：
-  - `add_library(gpusim_core ...)` 聚合 `src/*` 下各模块实现
-  - `target_include_directories(gpusim_core PUBLIC include)` 对外暴露头文件 `include/gpusim/*`
+- Repo-root `CMakeLists.txt` declares:
+  - `add_library(gpusim_core ...)` aggregates module implementations under `src/*`
+  - `target_include_directories(gpusim_core PUBLIC include)` exposes public headers `include/gpusim/*`
   - `add_executable(gpu-sim-cli src/apps/cli/main.cpp)`
   - `target_link_libraries(gpu-sim-cli PRIVATE gpusim_core)`
-  - 编译标准：C++17，且禁用编译器扩展（`CMAKE_CXX_EXTENSIONS OFF`）
+  - Build standard: C++17 and compiler extensions disabled (`CMAKE_CXX_EXTENSIONS OFF`)
 
 ---
 
-## 运行测试（CTest）
+## Running tests (CTest)
 
-本仓库使用 CTest 注册测试用例（见根目录 `CMakeLists.txt`）。
+This repo uses CTest to register test cases (see repo-root `CMakeLists.txt`).
 
-常用单元测试 CTest（均由 `scripts/run_unit_tests.*` 覆盖）：
+Common unit-test CTests (all covered by `scripts/run_unit_tests.*`):
+
 - `gpu-sim-tests`
-- `gpu-sim-inst-desc-tests`（inst_desc loader/契约相关的 targeted tests）
-- `gpu-sim-simt-tests`（SIMT predication/uniform-only/next_pc 分流相关的 targeted tests）
+- `gpu-sim-inst-desc-tests` (targeted tests around inst_desc loader/contracts)
+- `gpu-sim-simt-tests` (targeted tests around SIMT predication/uniform-only/next_pc routing)
 - `gpu-sim-builtins-tests`
 - `gpu-sim-config-parse-tests`
-- `gpu-sim-tiny-gpt2-mincov-tests`（Tier‑0 gate）
+- `gpu-sim-tiny-gpt2-mincov-tests` (Tier‑0 gate)
 
-Ninja/Makefiles（single-config）
+Ninja/Makefiles (single-config)
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -379,7 +402,7 @@ cmake --build build
 ctest --test-dir build -V
 ```
 
-Visual Studio（multi-config）
+Visual Studio (multi-config)
 
 ```bat
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
@@ -387,39 +410,39 @@ cmake --build build --config Release
 ctest --test-dir build -C Release -V
 ```
 
-Workload smoke tests（若启用 BUILD_TESTING）
-
 ---
 
-## tiny GPT-2 bring-up：最小覆盖回归（M1–M4）
+## tiny GPT-2 bring-up: minimal coverage regression (M1–M4)
 
-仓库内提供了一个端到端回归，用于确保 tiny GPT-2 bring-up 所需的最小闭环持续可用：
-- CTest：`gpu-sim-tiny-gpt2-mincov-tests`
+The repo contains an end-to-end regression to ensure the minimal loop required for tiny GPT-2 bring-up stays continuously available:
 
-它覆盖：
-- M1：`ld/st.global.f32` + `fma.f32` + predication
-- M4：`bra` loop（uniform control-flow）
+- CTest: `gpu-sim-tiny-gpt2-mincov-tests`
 
-### 运行方式（推荐）
+It covers:
 
-Windows（cmd）：
+- M1: `ld/st.global.f32` + `fma.f32` + predication
+- M4: `bra` loop (uniform control-flow)
+
+### How to run (recommended)
+
+Windows (cmd):
 
 ```bat
 scripts\run_unit_tests.bat build
 scripts\run_integration_tests.bat build
 ```
 
-Bash（Git Bash / WSL / Linux / macOS）：
+Bash (Git Bash / WSL / Linux / macOS):
 
 ```bash
 bash scripts/run_unit_tests.sh build
 bash scripts/run_integration_tests.sh build
 ```
 
-### 直接跑 CTest
+### Run CTest directly
 
 ```bash
 ctest --test-dir build -C Release -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 ```
 
-更多说明见用户文档：`docs/doc_user/tiny_gpt2_minimal_coverage.md`。
+For more details, see the user doc: `docs/doc_user/tiny_gpt2_minimal_coverage.md`.

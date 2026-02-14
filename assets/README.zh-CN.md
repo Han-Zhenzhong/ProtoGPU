@@ -27,7 +27,7 @@
 
 相关文档：
 - 使用者文档：[docs/doc_user/modular_hw_sw_mapping.md](../docs/doc_user/modular_hw_sw_mapping.md)
-- 构建与运行：[docs/doc_build/build.md](../docs/doc_build/build.md)
+- 构建与运行：[docs/doc_build/build.zh-CN.md](../docs/doc_build/build.zh-CN.md)
 
 ---
 

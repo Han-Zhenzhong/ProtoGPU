@@ -1,30 +1,33 @@
-# gpu-sim-cli（命令行）
+# gpu-sim-cli (command line)
 
-`gpu-sim-cli` 是最小可运行入口：加载 config/descriptor/PTX，执行仿真，并输出 trace/stats。
+> Chinese version: [cli.zh-CN.md](cli.zh-CN.md)
 
-## 参数
+`gpu-sim-cli` is the minimal runnable entry point: it loads config/descriptor/PTX, executes the simulation, and writes trace/stats.
 
-- `--workload <file>`：运行 WorkloadSpec（streams/commands）JSON（与单-kernel模式互斥）
-- `--ptx <file>`：PTX 输入文件路径
-- `--ptx-isa <file>`：PTX ISA 映射表 JSON 路径（必需：PTX op 形态 → ir_op + operand_kinds）
-- `--inst-desc <file>`：指令描述 JSON（inst_desc，IR 语义库：ir_op → uops）
-  - 兼容别名：`--desc <file>`
-- `--config <file>`：运行配置 JSON 路径
-- `--trace <file>`：trace 输出路径（jsonl）
-- `--stats <file>`：stats 输出路径（json）
-- `--io-demo`：启用 Kernel I/O + ABI 的最小端到端演示（见下文）
-- `--grid x,y,z`：设置 3D gridDim（默认 `1,1,1`）
-- `--block x,y,z`：设置 3D blockDim（默认 `<warp_size>,1,1`；warp_size 来自 config 的 `sim.warp_size`）
+## Arguments
 
-## 默认输入
+- `--workload <file>`: run a WorkloadSpec (streams/commands) JSON (mutually exclusive with single-kernel mode)
+- `--ptx <file>`: PTX input file path
+- `--ptx-isa <file>`: PTX ISA mapping JSON path (**required**: PTX instruction form → `ir_op` + `operand_kinds`)
+- `--inst-desc <file>`: instruction descriptor JSON (inst_desc, IR semantics library: `ir_op → uops`)
+  - Compatible alias: `--desc <file>`
+- `--config <file>`: runtime config JSON path
+- `--trace <file>`: trace output path (jsonl)
+- `--stats <file>`: stats output path (json)
+- `--io-demo`: enable the minimal end-to-end Kernel I/O + ABI demo (see below)
+- `--grid x,y,z`: set 3D gridDim (default `1,1,1`)
+- `--block x,y,z`: set 3D blockDim (default `<warp_size>,1,1`; warp_size comes from `config.sim.warp_size`)
 
-在仓库根目录运行时，默认使用：
-- PTX：`assets/ptx/demo_kernel.ptx`
-- PTX ISA map：`assets/ptx_isa/demo_ptx64.json`
-- 指令描述（inst_desc）：`assets/inst_desc/demo_desc.json`
-- 配置：`assets/configs/demo_config.json`
+## Default inputs
 
-## 常规运行
+When running from the repo root, the defaults are:
+
+- PTX: `assets/ptx/demo_kernel.ptx`
+- PTX ISA map: `assets/ptx_isa/demo_ptx64.json`
+- Instruction descriptor (inst_desc): `assets/inst_desc/demo_desc.json`
+- Config: `assets/configs/demo_config.json`
+
+## Typical run
 
 ```bash
 ./build/gpu-sim-cli \
@@ -38,70 +41,79 @@
   --stats out/stats.json
 ```
 
-## 多 SM 并行执行（06.02）
+## Multi-SM parallel execution (06.02)
 
-`gpu-sim-cli` 支持“每 SM 一个宿主线程”的并行执行基线，配置与限制见：
-- [doc_user/sm_parallel_execution.md](sm_parallel_execution.md)
+`gpu-sim-cli` supports a baseline “one host thread per SM” parallel execution mode. Configuration and limitations:
 
-## 模块化架构选择（10：profile/components）
+- [sm_parallel_execution.md](sm_parallel_execution.md)
 
-如果你希望“只改配置就切换 CTA/warp 调度策略与内存模型选择器”，参照：
-- [doc_user/modular_hw_sw_mapping.md](modular_hw_sw_mapping.md)
+## Modular architecture selection (10: profile/components)
 
-提示：运行时 trace 会写入一次性的 `RUN_START` 事件，用于观察本次运行实际选择了哪些组件组合。
+If you want to switch CTA/warp scheduling strategies and memory model selectors by configuration only, see:
 
-## 输出格式（trace/stats）契约（v1 基线）
+- [modular_hw_sw_mapping.md](modular_hw_sw_mapping.md)
 
-trace（`--trace`）
-- 输出为 JSONL（每行一个 JSON 对象）。
-- 第 1 行固定为 `TRACE_HEADER`：包含 `format_version/schema/profile/deterministic` 等元信息（用于版本化与向后兼容）。
-- 之后为事件流（当前 Tier‑0 最小集会包含：`RUN_START`/`FETCH`/`UOP`/`COMMIT`）。
-- 兼容性说明：`RUN_START.extra` 仍是一个 *stringified JSON*（双层 JSON）字段；脚本依赖的动作名（如 `RUN_START`）保持不变。
+Tip: the trace writes a one-time `RUN_START` event, which lets you observe which profile/components were selected for a run.
 
-SIMT 分歧/合流（M5）额外事件（`EventCategory::Ctrl`）
-- `SIMT_SPLIT`：遇到 divergent `bra`，拆分 taken/fallthrough 两条路径
-- `SIMT_MERGE`：某条路径到达 reconv 点，将 mask 合并到 join frame
-- `SIMT_POP`：弹出空路径帧（例如 active 为空）
+## Output format contract (trace/stats) (v1 baseline)
 
-stats（`--stats`）
-- 输出为一个 JSON 对象。
-- 顶层字段：`format_version/schema/profile/deterministic/counters`（只做 additive，不删除已有字段）。
+trace (`--trace`)
 
-## Public Runtime API（C++）
+- Output is JSONL (one JSON object per line).
+- Line 1 is always `TRACE_HEADER`: includes metadata like `format_version/schema/profile/deterministic` (for versioning/backward compatibility).
+- Then comes the event stream (current Tier‑0 minimal set includes: `RUN_START`/`FETCH`/`UOP`/`COMMIT`).
+- Compatibility note: `RUN_START.extra` is still a *stringified JSON* field (double-layer JSON); script-dependent action names (like `RUN_START`) remain stable.
 
-如果你希望把 gpu-sim 当作 C++ 库嵌入使用（尤其是“in-memory PTX + in-memory JSON assets”的打包方式），参照：
-- [doc_user/public_api.md](public_api.md)
+Extra events for SIMT divergence/reconvergence (M5) (`EventCategory::Ctrl`)
 
-该文档包含：
-- `Runtime::run_ptx_kernel_text(...)` 等 in-memory overload 的约定
-- `KernelArgs` / param blob 的用法
-- host/device 内存与 memcpy helpers
+- `SIMT_SPLIT`: divergent `bra` splits taken/fallthrough paths
+- `SIMT_MERGE`: a path reaches reconv point and merges mask into the join frame
+- `SIMT_POP`: pop an empty path frame (e.g. active mask becomes empty)
 
-## 常见诊断码（Troubleshooting 快速索引）
+stats (`--stats`)
 
-本项目的失败通常以 `Diagnostic{module, code, message, ...}` 的形式返回（或在少数 helper 中以异常抛出）。下面是用户侧最常见的几类：
+- Output is a single JSON object.
+- Top-level fields: `format_version/schema/profile/deterministic/counters` (additive only; do not remove existing fields).
 
-- `runtime:E_ENTRY_NOT_FOUND`：entry 名称不存在（PTX module 里没有该 `.entry`）
-- `runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`：grid/block 维度非法或乘法溢出
-- `instruction:DESC_NOT_FOUND`：`--ptx-isa` 缺少某条 PTX opcode 的映射 entry
-- `instruction:DESC_AMBIGUOUS`：同一条 PTX 指令被多条 ISA entry 同时匹配（需要让 `operand_kinds/type_mod` 更精确）
-- `frontend:OPERAND_PARSE_FAIL`：操作数 token 无法按 `operand_kinds` 解析（如寄存器/地址/立即数格式不符合）
-- `simt:E_DESC_MISS`：`--inst-desc` 缺少某条 IR 指令（`ir_op.type_mod(operand_kinds...)`）的语义
-- `simt:E_RECONV_MISS`：分歧 `bra` 缺少 reconv 点（CFG/ipdom 分析失败或不支持的控制流形态）
-- `simt:E_RECONV_INVALID`：reconv 点/CFG 非法（例如 branch target 越界、join frame 异常）
-- `simt:E_MEMORY_MODEL`：配置选择了未知 memory model（且 `allow_unknown_selectors=false`）
+## Public Runtime API (C++)
 
-## WorkloadSpec（--workload：streams/commands）
+If you want to embed gpu-sim as a C++ library (especially for the “in-memory PTX + in-memory JSON assets” packaging style), see:
 
-用途
-- 用一个“可重放”的 JSON 文件描述：buffers/modules/streams/commands。
-- 支持多 stream FIFO 与 `event_record` / `event_wait` 的依赖判定；trace 可复盘 `cmd_enq/cmd_ready/cmd_submit/cmd_complete`。
+- [public_api.md](public_api.md)
 
-参照文档
-- 抽象设计：`doc_design/modules/07_runtime_streaming.md`、`doc_design/modules/07.01_stream_input_workload_spec.md`
-- 实现设计：`doc_dev/modules/07_runtime_streaming.md`、`doc_dev/modules/07.01_stream_input_workload_spec.md`
+That document includes:
 
-运行示例
+- conventions for in-memory overloads like `Runtime::run_ptx_kernel_text(...)`
+- `KernelArgs` / param blob usage
+- host/device memory and memcpy helpers
+
+## Common diagnostic codes (troubleshooting quick index)
+
+Failures are typically surfaced as `Diagnostic{module, code, message, ...}` (or thrown as exceptions in a few helpers). Common ones include:
+
+- `runtime:E_ENTRY_NOT_FOUND`: entry name does not exist (no such `.entry` in the PTX module)
+- `runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`: illegal grid/block dimensions or multiplication overflow
+- `instruction:DESC_NOT_FOUND`: `--ptx-isa` is missing a mapping entry for an opcode
+- `instruction:DESC_AMBIGUOUS`: multiple ISA entries match the same PTX instruction (make `operand_kinds/type_mod` more specific)
+- `frontend:OPERAND_PARSE_FAIL`: operand tokens cannot be parsed as the expected `operand_kinds`
+- `simt:E_DESC_MISS`: `--inst-desc` is missing semantics for an IR instruction (`ir_op.type_mod(operand_kinds...)`)
+- `simt:E_RECONV_MISS`: a divergent `bra` is missing a reconvergence point (CFG/ipdom analysis failed or unsupported control flow)
+- `simt:E_RECONV_INVALID`: invalid reconv point / CFG (e.g. out-of-range branch target, broken join frame)
+- `simt:E_MEMORY_MODEL`: config selects an unknown memory model (and `allow_unknown_selectors=false`)
+
+## WorkloadSpec (`--workload`: streams/commands)
+
+Purpose
+
+- Describe replayable inputs via a JSON file: buffers/modules/streams/commands.
+- Supports multi-stream FIFO and event dependencies via `event_record` / `event_wait`; the trace can replay the command lifecycle: `cmd_enq/cmd_ready/cmd_submit/cmd_complete`.
+
+Docs
+
+- Abstract design: `doc_design/modules/07_runtime_streaming.md`, `doc_design/modules/07.01_stream_input_workload_spec.md`
+- Implementation design: `doc_dev/modules/07_runtime_streaming.md`, `doc_dev/modules/07.01_stream_input_workload_spec.md`
+
+Example
 
 ```bash
 ./build/gpu-sim-cli \
@@ -111,86 +123,94 @@ stats（`--stats`）
   --stats out/workload.stats.json
 ```
 
-模式互斥
-- 提供 `--workload` 时，禁止组合单-kernel参数：`--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`。
+Mutual exclusivity
 
-WorkloadSpec v0（当前实现能力）
+- When `--workload` is provided, single-kernel arguments are forbidden: `--ptx/--ptx-isa/--inst-desc/--grid/--block/--io-demo`.
+
+WorkloadSpec v0 (current implementation)
+
 - buffers
-  - `buffers.host[name]`: `{ bytes, init? }`，init 支持：`zeros`、`{hex: "..."}`、`{file: "path"}`
+  - `buffers.host[name]`: `{ bytes, init? }`, where init supports: `zeros`, `{hex: "..."}`, `{file: "path"}`
   - `buffers.device[name]`: `{ bytes, align? }`
 - modules
   - `modules[name]`: `{ ptx, ptx_isa, inst_desc }`
 - streams
-  - `streams[name].commands[]`: oneof：`copy/kernel/event_record/event_wait/sync`
+  - `streams[name].commands[]`: oneof: `copy/kernel/event_record/event_wait/sync`
 
-支持的命令（v0 基线）
-- `copy.kind`：目前仅支持 `H2D` 与 `D2H`（`D2D/MEMSET` 会报 schema/限制错误）
-- `kernel`：必须包含 `module/entry/grid_dim/block_dim/args`
-  - `grid_dim/block_dim` 支持两种写法：`{x,y,z}` 或 `[x,y,z]`
-  - `args` oneof：`{u32: N}` / `{u64: N}` / `{ptr_device: "dev_buf_name"}` / `{bytes_hex: "..."}`
-- `event_record/event_wait`：`{ event: "NAME" }`（event name 会 deterministically 映射到 EventId）
-- `sync {}`：作为显式同步点（当前实现为同步 runtime 下的 barrier/no-op，但会出现在 trace 的 cmd 生命周期中）
+Supported commands (v0 baseline)
 
-Workload schema 文件
-- `schemas/workload.schema.json` 作为“字段规范/契约”存在。
-- 当前实现采用“结构化校验 + 语义引用校验”的方式，不依赖通用 JSON Schema 引擎。
+- `copy.kind`: currently only `H2D` and `D2H` are supported (`D2D/MEMSET` errors)
+- `kernel`: must include `module/entry/grid_dim/block_dim/args`
+  - `grid_dim/block_dim` support two forms: `{x,y,z}` or `[x,y,z]`
+  - `args` oneof: `{u32: N}` / `{u64: N}` / `{ptr_device: "dev_buf_name"}` / `{bytes_hex: "..."}`
+- `event_record/event_wait`: `{ event: "NAME" }` (event names deterministically map to EventId)
+- `sync {}`: explicit sync point (currently a barrier/no-op, but appears in the trace command lifecycle)
 
-错误处理（基线）
-- JSON 解析/结构不合法：`runtime:E_WORKLOAD_SCHEMA`
-- 引用不存在的 buffer/module/event：`runtime:E_WORKLOAD_REF`
-- kernel entry 不存在：`runtime:E_ENTRY_NOT_FOUND`
-- 参数缺失/类型不匹配：`runtime:E_BAD_ARGS`
-- launch 维度非法：`runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`
-- 所有 stream 的队首都不 ready（常见原因：等待一个从未 record 的 event）：`runtime:E_WORKLOAD_DEADLOCK`
+Workload schema
 
-注意（当前实现限制）
-- runtime/streaming 的 “engines 分层 + async tick” 仍在演进；WorkloadSpec v0 目前以同步执行实现 FIFO 与 event 依赖语义。
-- `--workload` 运行 kernel 时，会按 `modules[name]` 指定的 `ptx/ptx_isa/inst_desc` 加载并执行；为保证可重放，请在 workload 里显式绑定这些路径。
+- `schemas/workload.schema.json` exists as the field-level contract.
+- The current implementation uses structured validation + semantic reference validation, not a generic JSON Schema engine.
 
-## 3D Kernel Launch（grid/block）语义
+Error handling (baseline)
 
-`--grid` 与 `--block` 控制一次 kernel launch 的执行域：
+- JSON parse/structure invalid: `runtime:E_WORKLOAD_SCHEMA`
+- Referencing missing buffer/module/event: `runtime:E_WORKLOAD_REF`
+- Kernel entry not found: `runtime:E_ENTRY_NOT_FOUND`
+- Missing args / type mismatch: `runtime:E_BAD_ARGS`
+- Illegal launch dims: `runtime:E_LAUNCH_DIM` / `runtime:E_LAUNCH_OVERFLOW`
+- No stream head is ready (often due to waiting on an event that is never recorded): `runtime:E_WORKLOAD_DEADLOCK`
 
-- `grid_dim = (grid.x, grid.y, grid.z)`：CTA（block）数量
-- `block_dim = (block.x, block.y, block.z)`：每个 CTA 内线程数为 `block.x * block.y * block.z`
+Notes (current limitations)
 
-SIMT 侧会对 CTA/warp/lane 做确定性枚举，并为部分 warp 设置 `active_mask`：
-- 当 `threads_per_block` 不是 `warp_size` 的整数倍时，最后一个 warp 只激活前 `threads_per_block % warp_size` 个 lanes。
+- The runtime/streaming “engines layering + async tick” is still evolving; WorkloadSpec v0 currently executes synchronously while enforcing FIFO + event dependency semantics.
+- When running kernels via `--workload`, modules are loaded and executed using `modules[name]` paths (`ptx/ptx_isa/inst_desc`); to ensure reproducibility, bind these paths explicitly in the workload.
 
-示例
+## 3D kernel launch semantics (grid/block)
+
+`--grid` and `--block` control the execution domain for a kernel launch:
+
+- `grid_dim = (grid.x, grid.y, grid.z)`: number of CTAs (blocks)
+- `block_dim = (block.x, block.y, block.z)`: threads per CTA is `block.x * block.y * block.z`
+
+SIMT deterministically enumerates CTA/warp/lane and sets `active_mask` for some warps:
+
+- If `threads_per_block` is not a multiple of `warp_size`, the last warp only activates the first `threads_per_block % warp_size` lanes.
+
+Example
 
 ```bash
-# 2 个 CTA；每个 CTA 为 40 threads（会产生 2 个 warp，其中第 2 个 warp 只激活 8 lanes）
+# 2 CTAs; each CTA has 40 threads (2 warps, where the 2nd warp has only 8 active lanes)
 ./build/gpu-sim-cli --grid 2,1,1 --block 40,1,1
 ```
 
-错误处理（基线）
-- 任一维度为 0：`runtime:E_LAUNCH_DIM`
-- `block.x * block.y * block.z` 乘法溢出：`runtime:E_LAUNCH_OVERFLOW`
+Error handling (baseline)
 
-## builtin（例如 %tid.x / %ctaid.x）
+- Any dimension is 0: `runtime:E_LAUNCH_DIM`
+- `block.x * block.y * block.z` multiplication overflow: `runtime:E_LAUNCH_OVERFLOW`
 
-本项目将 builtin 作为一种操作数类型（`special`）来支持。当前基线支持：
-- `%tid.{x,y,z}`、`%ntid.{x,y,z}`、`%ctaid.{x,y,z}`、`%nctaid.{x,y,z}`
-- `%laneid`、`%warpid`
+## Builtins (e.g. %tid.x / %ctaid.x)
 
-注意
-- `%laneid/%warpid` 是标量 builtin（无 `.x/.y/.z` 后缀）。
+This project supports builtins as an operand kind (`special`). Current baseline supports:
 
-注意
-- 是否能“执行到 builtin 读取”取决于你提供的 `--ptx-isa` / `--inst-desc` 是否包含对应 form（例如 `mov.u32 (reg, special)`）。
-- demo 资产已提供最小 form：`mov.u32 %r0, %tid.x;` 能映射并执行。
+- `%tid.{x,y,z}`, `%ntid.{x,y,z}`, `%ctaid.{x,y,z}`, `%nctaid.{x,y,z}`
+- `%laneid`, `%warpid`
 
-## PTX op → IR op 映射（`--ptx-isa`）
+Notes
 
-用户侧只需要关心“PTX（当前工程基线为 6.4）的指令长什么样，映射到哪个通用 IR opcode”。这一步由 `--ptx-isa` 提供的 PTX ISA map 完成：
+- `%laneid/%warpid` are scalar builtins (no `.x/.y/.z` suffix).
+- Whether you can “execute through to builtin reads” depends on whether your `--ptx-isa` / `--inst-desc` include the corresponding form (e.g. `mov.u32 (reg, special)`).
+- The demo assets include a minimal form: `mov.u32 %r0, %tid.x;` can be mapped and executed.
 
-- `ptx_opcode`：PTX 指令名（例如 `mov/add/ld/ret`）
-- `type_mod`：类型修饰（例如 `u32/u64`；空字符串表示 wildcard）
-- `operand_kinds`：该 PTX form 期望的操作数种类序列（例如 `reg/imm/symbol/addr/pred`）
-- `ir_op`：映射到的 IR opcode（后续用 `--inst-desc` 查语义并展开 uops）
+## PTX op → IR op mapping (`--ptx-isa`)
 
-示例：同一个 PTX opcode `mov.u32` 可能有多种 form，但都可以映射到同一个 IR opcode `mov`：
+As a user, you only need to care about “what PTX instructions look like (baseline is PTX 6.4) and which generic IR opcode they map to”. This is handled by the PTX ISA map provided via `--ptx-isa`:
+
+- `ptx_opcode`: PTX instruction name (e.g. `mov/add/ld/ret`)
+- `type_mod`: type modifier (e.g. `u32/u64`; empty string means wildcard)
+- `operand_kinds`: expected operand-kind sequence for this PTX form (e.g. `reg/imm/symbol/addr/pred`)
+- `ir_op`: mapped IR opcode (execution semantics then come from `--inst-desc`, which expands to µops)
+
+Example: the same PTX opcode `mov.u32` may have multiple forms, but they can all map to the same IR opcode `mov`:
 
 ```json
 {
@@ -210,30 +230,34 @@ SIMT 侧会对 CTA/warp/lane 做确定性枚举，并为部分 warp 设置 `acti
 }
 ```
 
-mapper 会按 `operand_kinds` 尝试解析 token：
+The mapper parses tokens according to `operand_kinds`:
 
-- `mov.u32 %r0, 0;` → 匹配 `(reg,imm)`
-- `mov.u32 %r0, foo;` → 匹配 `(reg,symbol)`
+- `mov.u32 %r0, 0;` → matches `(reg, imm)`
+- `mov.u32 %r0, foo;` → matches `(reg, symbol)`
 
-如果同一条 PTX 指令被多条 entry 同时匹配，会报 `DESC_AMBIGUOUS`，并在 message 里列出所有匹配到的候选签名（`(operand_kinds) -> ir_op.type_mod`），便于你把 PTX ISA map 调整到“只有一条能匹配”。
+If multiple entries match the same PTX instruction, it reports `DESC_AMBIGUOUS` and lists the candidate signatures in the message (`(operand_kinds) -> ir_op.type_mod`), so you can refine the PTX ISA map until exactly one entry matches.
 
-注意：`--ptx-isa` 只决定 PTX→IR 的映射；真正执行语义来自 `--inst-desc`（IR opcode → uops）。因此你在 `--ptx-isa` 里引入新的 `ir_op` 或新的 operand form 时，也需要在 inst_desc 里提供对应语义条目。
+Note: `--ptx-isa` only determines PTX→IR mapping; execution semantics come from `--inst-desc` (IR opcode → µops). If you introduce a new `ir_op` or operand form in `--ptx-isa`, you must also provide matching semantics in inst_desc.
 
-## Kernel I/O 演示（`--io-demo`）
+## Kernel I/O demo (`--io-demo`)
 
-用途
-- 验证：`.param` 参数输入 → kernel 写 global memory → host 显式 D2H 回读
+Purpose
 
-运行
+- Validate: `.param` argument input → kernel writes global memory → host explicitly reads back via D2H
+
+Run
 
 ```bash
 ./build/gpu-sim-cli --ptx assets/ptx/write_out.ptx --io-demo
 ```
 
-预期输出
-- 终端打印：`io-demo u32 result: 42`
-- `out/trace.jsonl` 与 `out/stats.json` 正常生成
+Expected
 
-## 测试（scripts/）
+- Console prints: `io-demo u32 result: 42`
+- `out/trace.jsonl` and `out/stats.json` are generated
 
-如需快速回归单元/集成测试，直接使用仓库根目录的脚本入口，见 [doc_user/scripts.md](scripts.md)。
+## Tests (scripts/)
+
+For quick unit/integration regression, use the repo-root script entry points:
+
+- [scripts.md](scripts.md)

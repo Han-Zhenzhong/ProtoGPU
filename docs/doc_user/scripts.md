@@ -1,98 +1,103 @@
-# scripts/（测试脚本）
+# scripts/ (test scripts)
 
-仓库根目录的 scripts/ 提供了“跑单元测试 / 跑集成测试”的快捷入口，适合本地快速回归。
+> Chinese version: [scripts.zh-CN.md](scripts.zh-CN.md)
 
-## 前置条件
+The repo-root `scripts/` directory provides quick entry points to run unit tests and integration tests, which is handy for fast local regression.
 
-- 建议从“仓库根目录”执行脚本（使用相对路径资源）。
-- 说明：脚本内部会自动切换到仓库根目录执行，因此也可以从任意工作目录调用。
+## Prerequisites
 
-说明：目前 `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
+- It’s recommended to run the scripts from the **repo root** (they use relative paths to assets).
+- Note: the scripts will automatically `cd` to the repo root internally, so you can also invoke them from any working directory.
 
-## 构建（可选手动执行）
+Currently, `run_unit_tests.*` / `run_integration_tests.*` will auto-call `scripts/build.*` (configure + build) if the build directory or target executables are missing.
 
-用途：执行 CMake configure + build。
+## Build (optional manual step)
 
-Windows（cmd）
+Purpose: run CMake configure + build.
+
+Windows (cmd)
 
 ```bat
 scripts\build.bat build Release
 ```
 
-Bash（Git Bash / WSL / Linux / macOS）
+Bash (Git Bash / WSL / Linux / macOS)
 
 ```bash
 bash scripts/build.sh build Release
 ```
 
-常用环境变量
+Common environment variables
 
-- `CONFIG=Debug|Release`：选择 multi-config 的配置（Visual Studio / Xcode）；Ninja 单配置时也会作为 `CMAKE_BUILD_TYPE` 使用
-- `BUILD_TESTING=ON|OFF`：是否构建测试目标（默认 ON）
-- `GENERATOR`：强制指定 CMake generator（例如 `Ninja`），不设置则优先自动使用 Ninja（如果系统有）
+- `CONFIG=Debug|Release`: selects the multi-config configuration (Visual Studio / Xcode); for single-config Ninja it is also used as `CMAKE_BUILD_TYPE`
+- `BUILD_TESTING=ON|OFF`: whether to build test targets (default: ON)
+- `GENERATOR`: force a specific CMake generator (e.g. `Ninja`); if not set, the scripts prefer Ninja automatically when available
 
-## 单元测试
+## Unit tests
 
-用途：运行 `gpu-sim-tests`（或通过 `ctest` 运行已注册的 CTest 用例）。
+Purpose: run `gpu-sim-tests` (or run registered CTest cases via `ctest`).
 
-Windows（cmd）
+Windows (cmd)
 
 ```bat
 scripts\run_unit_tests.bat build
 ```
 
-Bash（Git Bash / WSL / Linux / macOS）
+Bash (Git Bash / WSL / Linux / macOS)
 
 ```bash
 bash scripts/run_unit_tests.sh build
 ```
 
-说明
+Notes
 
-- 脚本优先使用 `ctest --test-dir <build>`；若系统没有 ctest，则直接尝试运行单元测试可执行文件。
-- Visual Studio / Xcode 等 multi-config 生成器可通过 `CONFIG=Debug|Release` 选择配置。
+- The scripts prefer `ctest --test-dir <build>`; if `ctest` is not available, they attempt to run the unit test executable directly.
+- For Visual Studio / Xcode multi-config generators, use `CONFIG=Debug|Release` to select the configuration.
 
-当前也会包含一个 tiny GPT-2 bring-up 的最小端到端回归：
-- `gpu-sim-tiny-gpt2-mincov-tests`（M1 fma/ld/st/predication + M4 bra loop）
+Unit tests currently also include a minimal end-to-end tiny GPT-2 bring-up regression:
 
-同时也会包含一些更 targeted 的单元测试（例如 inst_desc loader/契约相关）：
+- `gpu-sim-tiny-gpt2-mincov-tests` (M1 fma/ld/st/predication + M4 bra loop)
+
+It also includes more targeted tests (for example, around inst_desc loading/contracts):
+
 - `gpu-sim-inst-desc-tests`
-- `gpu-sim-simt-tests`（SIMT predication/uniform-only/next_pc 分流相关）
-- `gpu-sim-memory-tests`（memory.model / addrspace 路径与诊断码锁定回归）
-- `gpu-sim-observability-contract-tests`（trace/stats 输出契约：TRACE_HEADER 与 stats meta 字段）
-- `gpu-sim-public-api-tests`（public Runtime API：in-memory PTX + in-memory JSON assets 回归）
+- `gpu-sim-simt-tests` (SIMT predication / uniform-only / next_pc routing)
+- `gpu-sim-memory-tests` (memory model / addrspace paths and diagnostic-code lock-in)
+- `gpu-sim-observability-contract-tests` (trace/stats output contract: TRACE_HEADER + stats meta fields)
+- `gpu-sim-public-api-tests` (public Runtime API: in-memory PTX + in-memory JSON assets regression)
 
-其中也包含若干 fail-fast 行为的锁定回归（例如 global OOB/未分配访问必须报错、以及 global 访问对齐检查）。
+There are also regressions that lock in fail-fast behaviors (e.g. global OOB / unallocated access must error, and global access alignment checks).
 
-## 集成测试
+## Integration tests
 
-用途：运行 `gpu-sim-cli` 的 demo 路径并做最小校验：
+Purpose: run `gpu-sim-cli` along a demo path and perform minimal validation:
 
-- smoke：运行 demo kernel（检查 trace/stats 产物存在且非空）
-- trace 元信息：检查 trace 包含一次性 `RUN_START`（用于观测 profile/components 组合）
-- io-demo：运行 `--io-demo`（检查 stdout 包含 `io-demo u32 result: 42`）
-- modular selectors：运行 `assets/configs/demo_modular_selectors.json` 并检查选择器字符串在 trace 中可观察
+- smoke: run a demo kernel (verify trace/stats artifacts exist and are non-empty)
+- trace metadata: verify trace contains a one-time `RUN_START` (to observe profile/components selection)
+- io-demo: run `--io-demo` (verify stdout contains `io-demo u32 result: 42`)
+- modular selectors: run `assets/configs/demo_modular_selectors.json` and verify the selector string is observable in the trace
 
-同时（若系统存在 `ctest`）也会运行：
-- `gpu-sim-tiny-gpt2-mincov-tests`（tiny GPT-2 最小覆盖回归）
+Also (if `ctest` exists), it runs:
 
-Windows（cmd）
+- `gpu-sim-tiny-gpt2-mincov-tests` (tiny GPT-2 minimal coverage regression)
+
+Windows (cmd)
 
 ```bat
 scripts\run_integration_tests.bat build
 ```
 
-Bash（Git Bash / WSL / Linux / macOS）
+Bash (Git Bash / WSL / Linux / macOS)
 
 ```bash
 bash scripts/run_integration_tests.sh build
 ```
 
-输出
+Outputs
 
-- 产物目录：`<build>/test_out/`
-- 文件包含：stdout/stderr、trace/stats 等，便于定位失败原因
+- Artifact directory: `<build>/test_out/`
+- Contains: stdout/stderr logs, trace/stats, etc., which helps debug failures
 
-## 更详细说明
+## More details
 
-- 脚本实现与参数约定见 [scripts/README.md](../scripts/README.md)。
+- Script implementation and argument conventions: [../../scripts/README.md](../../scripts/README.md)

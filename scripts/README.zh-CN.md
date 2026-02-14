@@ -7,7 +7,7 @@
 
 说明
 - 构建方式与环境要求见构建文档：
-	- [docs/doc_build/build.md](../docs/doc_build/build.md)
+	- [docs/doc_build/build.zh-CN.md](../docs/doc_build/build.zh-CN.md)
 - `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
 
 ## 测试脚本

@@ -156,7 +156,7 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
 
 假设已编译出 demo.ptx，且已准备好对应的资产文件：
 
-> **注：** `build/gpu-sim-cli` 的编译方法详见 [../../docs/doc_build/build.md](../../docs/doc_build/build.md)。
+> **注：** `build/gpu-sim-cli` 的编译方法详见 [../../docs/doc_build/build.zh-CN.md](../../docs/doc_build/build.zh-CN.md)。
 
 建议在**仓库根目录**执行（路径与下面命令一致）：
 

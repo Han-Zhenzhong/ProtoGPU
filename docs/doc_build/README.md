@@ -1,5 +1,7 @@
 # doc_build/
 
-本目录存放“构建与发布相关文档”。
+> Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-- [build.md](build.md)：如何在本地编译 gpu-sim（CMake），以及产物与运行目录约定。
+Build and release related documentation.
+
+- [build.md](build.md): how to build gpu-sim locally (CMake), and conventions for artifacts and runtime working directories.
