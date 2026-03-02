@@ -1,0 +1,21 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(head -n 1 "$COMMIT_MSG_FILE")
+
+PATTERN='^(feat|fix|perf|refactor|test|docs|build|ci|chore)(\([a-zA-Z0-9_-]+\))?: .{5,}$'
+
+if ! echo "$COMMIT_MSG" | grep -Eq "$PATTERN"; then
+  echo "❌ Invalid commit message format."
+  echo ""
+  echo "Expected:"
+  echo "  type(scope): subject"
+  echo ""
+  echo "Examples:"
+  echo "  feat(sim): add warp scheduler"
+  echo "  fix(memory): avoid null dereference"
+  echo "  chore: enforce LF line endings"
+  exit 1
+fi
+
+exit 0
