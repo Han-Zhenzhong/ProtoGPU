@@ -1,3 +1,3 @@
 # build outputs
-./build/
-./tmp/
+build/*
+tmp/*
