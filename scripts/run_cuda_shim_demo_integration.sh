@@ -26,6 +26,19 @@ if [[ ! -x "$DEMO" ]]; then
   exit "$SKIP_RC"
 fi
 
+# The shim's fatbin->PTX extraction is still MVP-level, so default to providing
+# an explicit text PTX module for this demo.
+DEFAULT_PTX_OVERRIDE="$REPO_ROOT/cuda/demo/demo.ptx"
+PTX_OVERRIDE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$DEFAULT_PTX_OVERRIDE}"
+if [[ ! -f "$PTX_OVERRIDE" ]]; then
+  if [[ -n "${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}" ]]; then
+    echo "error: GPUSIM_CUDART_SHIM_PTX_OVERRIDE points to missing file: $PTX_OVERRIDE" >&2
+    exit 2
+  fi
+  echo "[cudart-shim-demo] skip: missing $DEFAULT_PTX_OVERRIDE" >&2
+  exit "$SKIP_RC"
+fi
+
 need_build=0
 if [[ ! -d "$BUILD_DIR" ]]; then
   need_build=1
@@ -66,6 +79,7 @@ mkdir -p "$OUT_DIR"
 echo "[cudart-shim-demo] running demo with LD_LIBRARY_PATH=$SHIM_DIR"
 set +e
 LD_LIBRARY_PATH="$SHIM_DIR" \
+  GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PTX_OVERRIDE" \
   GPUSIM_CUDART_SHIM_LOG="${GPUSIM_CUDART_SHIM_LOG:-0}" \
   "$DEMO" >"$OUT_DIR/cudart_demo_stdout.txt" 2>"$OUT_DIR/cudart_demo_stderr.txt"
 RC=$?
