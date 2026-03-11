@@ -129,7 +129,8 @@ clang++ streaming_demo.cu -S -o streaming_demo.ptx \
 
 Notes:
 
-- The current CUDA Runtime shim’s fatbin→PTX extraction is still MVP-level (different toolchains may embed PTX in tokenized/encoded form inside the fatbin), so it’s recommended to explicitly provide a text PTX via `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`.
+- The current CUDA Runtime shim’s fatbin→PTX extraction is still MVP-level (different toolchains may embed PTX in tokenized/encoded form inside the fatbin), so it’s recommended to explicitly provide text PTX via `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`.
+- On Linux/WSL, `GPUSIM_CUDART_SHIM_PTX_OVERRIDE` may be a single PTX path or a `:`-delimited PTX path list. The shim searches listed PTX files in order, and the first PTX containing the requested `.entry` wins.
 - `-S` forces emission of **text PTX assembly**; otherwise, some clang versions/flag combinations may treat the output as an object file or another intermediate, leading to a `*.ptx` that isn’t readable PTX text.
 
 ### 2.3.3 Run via the CUDA Runtime shim (Linux/WSL)
@@ -146,6 +147,14 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
 
 ./cuda/demo/streaming_demo
 ```
+
+Multi-PTX example on Linux/WSL:
+
+```bash
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD/cuda/demo/streaming_demo_b.ptx"
+```
+
+If the override env var is explicitly set and any listed PTX file is missing, empty, or not valid PTX text, the shim fails fast and does not fall back to fatbin extraction.
 
 ---
 

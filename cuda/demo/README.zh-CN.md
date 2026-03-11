@@ -133,6 +133,7 @@ clang++ streaming_demo.cu -S -o streaming_demo.ptx \
 说明：
 - 当前 CUDA Runtime shim 的 fatbin→PTX 提取仍是 MVP 级别（不同工具链可能把 PTX 以 tokenized/encoded 形式放进 fatbin），
   因此运行这个 demo 时建议用 `GPUSIM_CUDART_SHIM_PTX_OVERRIDE` 显式提供文本 PTX。
+- 在 Linux/WSL 上，`GPUSIM_CUDART_SHIM_PTX_OVERRIDE` 可以是单个 PTX 路径，也可以是用 `:` 分隔的 PTX 路径列表。shim 会按顺序搜索这些 PTX，命中请求 `.entry` 的第一个 PTX 即为最终选择。
 - `-S` 用于强制输出**文本 PTX 汇编**；否则 clang 在某些版本/参数组合下可能把输出当作目标文件或其它中间产物，导致 `*.ptx` 不是可读的 PTX 文本。
 
 ### 2.3.3 使用 CUDA Runtime shim 运行（Linux/WSL）
@@ -149,6 +150,14 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo.ptx"
 
 ./cuda/demo/streaming_demo
 ```
+
+Linux/WSL 下的多 PTX 示例：
+
+```bash
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD/cuda/demo/streaming_demo_b.ptx"
+```
+
+如果显式设置了 override 环境变量，而列表中的任一 PTX 文件缺失、为空或不是合法 PTX 文本，shim 会立即失败，并且不会回退到 fatbin 提取。
 
 ---
 

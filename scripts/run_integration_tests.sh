@@ -60,6 +60,11 @@ if [[ -f "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" ]]; then
   bash "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" "$BUILD_DIR"
 fi
 
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_multi_ptx_demo_integration.sh" ]]; then
+  echo "[integration] running CUDA Runtime shim multi-PTX demo integration (if supported)"
+  bash "$SCRIPT_DIR/run_cuda_shim_multi_ptx_demo_integration.sh" "$BUILD_DIR"
+fi
+
 if [[ -f "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" ]]; then
   echo "[integration] running CUDA Runtime shim streaming .cu demo (if supported)"
   bash "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" "$BUILD_DIR"

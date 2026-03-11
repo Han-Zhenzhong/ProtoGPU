@@ -24,10 +24,11 @@ This directory provides two entry points:
 On Linux/WSL, integration tests will also try to run an end-to-end CUDA Runtime shim demo regression (if `cuda/demo/demo` exists and the shim has been built):
 
 - `scripts/run_cuda_shim_demo_integration.sh`
+- `scripts/run_cuda_shim_multi_ptx_demo_integration.sh`
 
 If clang + CUDA Toolkit are installed (i.e. `CUDA_PATH/include/cuda_runtime.h` is found), integration tests will also attempt to:
 
-- Build and run `cuda/demo/streaming_demo.cu` (via the shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`)
+- Build and run `cuda/demo/streaming_demo.cu` (via the shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`, which may be a single PTX path or a `:`-delimited PTX path list on Linux/WSL)
 - Script entry: `scripts/run_cuda_shim_streaming_demo_cu.sh`
 
 In addition, the test scripts include a minimal end-to-end tiny GPT-2 bring-up regression (CTests):

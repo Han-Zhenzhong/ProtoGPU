@@ -78,6 +78,7 @@ mkdir -p "$OUT_DIR"
 
 BIN="$OUT_DIR/streaming_demo"
 PTX="$OUT_DIR/streaming_demo.ptx"
+PTX_OVERRIDE_VALUE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$PTX}"
 STDOUT="$OUT_DIR/cudart_streaming_cu_stdout.txt"
 STDERR="$OUT_DIR/cudart_streaming_cu_stderr.txt"
 
@@ -124,7 +125,7 @@ fi
 echo "[cudart-shim-streaming-cu] running under shim (LD_LIBRARY_PATH=$SHIM_DIR)"
 set +e
 LD_LIBRARY_PATH="$SHIM_DIR" \
-	GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PTX" \
+	GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PTX_OVERRIDE_VALUE" \
 	GPUSIM_CUDART_SHIM_LOG="${GPUSIM_CUDART_SHIM_LOG:-0}" \
 	"$BIN" >"$STDOUT" 2>"$STDERR"
 RC=$?

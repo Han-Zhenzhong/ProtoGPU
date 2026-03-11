@@ -58,6 +58,25 @@ _gpusim_prepend_path_var() {
 	fi
 }
 
+_gpusim_validate_ptx_override_value() {
+	local value="$1"
+	local delim=':'
+	local parts=()
+	local part=""
+
+	IFS="$delim" read -r -a parts <<< "$value"
+	for part in "${parts[@]}"; do
+		part="${part#${part%%[![:space:]]*}}"
+		part="${part%${part##*[![:space:]]}}"
+		if [[ -z "$part" ]]; then
+			_gpusim_die "PTX override contains an empty path element: $value"
+		fi
+		if [[ ! -f "$part" ]]; then
+			_gpusim_die "PTX override file not found: $part"
+		fi
+	done
+}
+
 _gpusim_usage() {
 	cat >&2 <<'EOF'
 Usage:
@@ -65,7 +84,7 @@ Usage:
 
 Args:
 	build_dir      Build dir to search (default: build)
-	ptx_override   Optional: path to a text PTX file to set as GPUSIM_CUDART_SHIM_PTX_OVERRIDE
+	ptx_override   Optional: path or ':'-delimited path list of text PTX files to set as GPUSIM_CUDART_SHIM_PTX_OVERRIDE
 
 Env:
 	CONFIG         Multi-config subdir name (default: Release)
@@ -75,6 +94,9 @@ Examples:
 	./cuda/demo/demo
 
 	source scripts/setup_cudart_shim_running_env.sh build "$PWD/cuda/demo/streaming_demo.ptx"
+	./cuda/demo/streaming_demo
+
+	source scripts/setup_cudart_shim_running_env.sh build "$PWD/a.ptx:$PWD/b.ptx"
 	./cuda/demo/streaming_demo
 EOF
 }
@@ -106,9 +128,7 @@ _gpusim_set "GPUSIM_CUDART_SHIM_DIR" "$_GPUSIM_REPO_ROOT/$SHIM_DIR"
 _gpusim_prepend_path_var "LD_LIBRARY_PATH" "$_GPUSIM_REPO_ROOT/$SHIM_DIR"
 
 if [[ -n "$PTX_OVERRIDE_PATH" ]]; then
-	if [[ ! -f "$PTX_OVERRIDE_PATH" ]]; then
-		_gpusim_die "PTX override file not found: $PTX_OVERRIDE_PATH"
-	fi
+	_gpusim_validate_ptx_override_value "$PTX_OVERRIDE_PATH"
 	_gpusim_set "GPUSIM_CUDART_SHIM_PTX_OVERRIDE" "$PTX_OVERRIDE_PATH"
 fi
 
@@ -128,6 +148,8 @@ if [[ $_GPUSIM_IS_SOURCED -eq 1 ]]; then
 	_gpusim_note "set LD_LIBRARY_PATH to include: $_GPUSIM_REPO_ROOT/$SHIM_DIR"
 	if [[ -n "$PTX_OVERRIDE_PATH" ]]; then
 		_gpusim_note "set GPUSIM_CUDART_SHIM_PTX_OVERRIDE=$PTX_OVERRIDE_PATH"
+	elif [[ -n "${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}" ]]; then
+		_gpusim_note "using existing GPUSIM_CUDART_SHIM_PTX_OVERRIDE=${GPUSIM_CUDART_SHIM_PTX_OVERRIDE}"
 	fi
 else
 	# When executed for eval, print nothing else on stdout.

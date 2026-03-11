@@ -9,6 +9,26 @@ CONFIG="${CONFIG:-Release}"
 
 SKIP_RC="${GPUSIM_TEST_SKIP_RC:-0}"
 
+validate_ptx_override_value() {
+  local value="$1"
+  local part=""
+  local -a parts=()
+
+  IFS=':' read -r -a parts <<< "$value"
+  for part in "${parts[@]}"; do
+    part="${part#${part%%[![:space:]]*}}"
+    part="${part%${part##*[![:space:]]}}"
+    if [[ -z "$part" ]]; then
+      echo "error: GPUSIM_CUDART_SHIM_PTX_OVERRIDE contains an empty path element: $value" >&2
+      return 2
+    fi
+    if [[ ! -f "$part" ]]; then
+      echo "error: GPUSIM_CUDART_SHIM_PTX_OVERRIDE points to missing file: $part" >&2
+      return 2
+    fi
+  done
+}
+
 cd "$REPO_ROOT"
 
 if [[ "$(uname -s)" != "Linux"* ]]; then
@@ -30,11 +50,9 @@ fi
 # an explicit text PTX module for this demo.
 DEFAULT_PTX_OVERRIDE="$REPO_ROOT/cuda/demo/demo.ptx"
 PTX_OVERRIDE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$DEFAULT_PTX_OVERRIDE}"
-if [[ ! -f "$PTX_OVERRIDE" ]]; then
-  if [[ -n "${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}" ]]; then
-    echo "error: GPUSIM_CUDART_SHIM_PTX_OVERRIDE points to missing file: $PTX_OVERRIDE" >&2
-    exit 2
-  fi
+if [[ -n "${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}" ]]; then
+  validate_ptx_override_value "$PTX_OVERRIDE" || exit $?
+elif [[ ! -f "$DEFAULT_PTX_OVERRIDE" ]]; then
   echo "[cudart-shim-demo] skip: missing $DEFAULT_PTX_OVERRIDE" >&2
   exit "$SKIP_RC"
 fi
