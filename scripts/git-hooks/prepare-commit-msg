@@ -1,0 +1,33 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -z "$REPO_ROOT" ] || [ ! -f "$REPO_ROOT/scripts/git-hooks/commit-msg-types.sh" ]; then
+  exit 0
+fi
+
+. "$REPO_ROOT/scripts/git-hooks/commit-msg-types.sh"
+
+# Only annotate the interactive editor flow. For -m/-F/merge/squash cases,
+# avoid mutating the message unexpectedly.
+case "$COMMIT_SOURCE" in
+  message|merge|squash|commit)
+    exit 0
+    ;;
+esac
+
+if grep -Fq "Allowed types:" "$COMMIT_MSG_FILE"; then
+  exit 0
+fi
+
+{
+  printf '\n'
+  printf '# Allowed types: %s\n' "$COMMIT_TYPE_LIST"
+  printf '# Format: type(scope): subject\n'
+  printf '# Examples:\n'
+  printf '#   feat(sim): add warp scheduler\n'
+  printf '#   fix(memory): avoid null dereference\n'
+  printf '#   chore: enforce LF line endings\n'
+} >> "$COMMIT_MSG_FILE"

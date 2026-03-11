@@ -3,13 +3,22 @@
 COMMIT_MSG_FILE="$1"
 COMMIT_MSG=$(head -n 1 "$COMMIT_MSG_FILE")
 
-PATTERN='^(feat|fix|perf|refactor|test|docs|build|ci|chore)(\([a-zA-Z0-9_-]+\))?: .{5,}$'
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -z "$REPO_ROOT" ] || [ ! -f "$REPO_ROOT/scripts/git-hooks/commit-msg-types.sh" ]; then
+  echo "❌ Cannot locate commit type config under scripts/git-hooks/." >&2
+  exit 1
+fi
 
-if ! echo "$COMMIT_MSG" | grep -Eq "$PATTERN"; then
+. "$REPO_ROOT/scripts/git-hooks/commit-msg-types.sh"
+
+if ! echo "$COMMIT_MSG" | grep -Eq "$COMMIT_MSG_REGEX"; then
   echo "❌ Invalid commit message format."
   echo ""
   echo "Expected:"
   echo "  type(scope): subject"
+  echo ""
+  echo "Allowed types:"
+  echo "  $COMMIT_TYPE_LIST"
   echo ""
   echo "Examples:"
   echo "  feat(sim): add warp scheduler"

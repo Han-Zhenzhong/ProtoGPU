@@ -49,6 +49,7 @@ install_hook() {
 
 # 4. 安装 hooks
 install_hook pre-commit
+install_hook prepare-commit-msg
 install_hook commit-msg
 
 echo ""
