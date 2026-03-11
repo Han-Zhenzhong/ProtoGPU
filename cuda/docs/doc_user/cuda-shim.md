@@ -127,9 +127,17 @@ Optional env vars (MVP debugging aids):
 - `GPUSIM_CUDART_SHIM_DUMP_PTX=<pathPrefix>`: dump extracted PTX modules as `<pathPrefix>_<i>.ptx`.
 
 If your toolchain embeds PTX in a tokenized/compressed form inside the fatbin (so the dumped `.ptx` looks garbled),
-you can provide a known-good PTX file to the shim:
+you can provide known-good PTX text file path(s) to the shim:
 
 - `GPUSIM_CUDART_SHIM_PTX_OVERRIDE=<path/to/module.ptx>`: use this PTX text instead of extracting PTX from the fatbin.
+- `GPUSIM_CUDART_SHIM_PTX_OVERRIDE=<path/a.ptx>:<path/b.ptx>` on Linux/WSL: load multiple PTX text files in order.
+- `GPUSIM_CUDART_SHIM_PTX_OVERRIDE=<path\\a.ptx>;<path\\b.ptx>` on Windows: load multiple PTX text files in order.
+
+Multi-PTX rules:
+- the override is authoritative once the env var is set; the shim does not fall back to fatbin extraction if any listed element is invalid
+- listed PTX files are searched in order
+- the first PTX text containing the requested `.entry` wins
+- empty path-list elements are rejected as configuration errors
 
 ---
 
@@ -154,4 +162,18 @@ Via repo script (also invoked by `scripts/run_integration_tests.sh`):
 
 ```bash
 bash scripts/run_cuda_shim_demo_integration.sh build
+```
+
+There is also an end-to-end multi-PTX integration test that verifies ordered PTX lookup across multiple override files and a malformed-list failure case.
+
+Via CTest:
+
+```bash
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-multi-ptx-demo-integration$"
+```
+
+Via repo script:
+
+```bash
+bash scripts/run_cuda_shim_multi_ptx_demo_integration.sh build
 ```
