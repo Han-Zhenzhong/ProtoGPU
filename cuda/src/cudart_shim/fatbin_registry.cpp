@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <optional>
+#include <string_view>
 
 #include <new>
 
@@ -238,24 +239,138 @@ static void maybe_dump_bytes(const void* p, std::size_t n, const char* env_name)
   f.write(reinterpret_cast<const char*>(p), static_cast<std::streamsize>(n));
 }
 
+struct OverrideLoadError final {
+  std::size_t index = 0;
+  std::string path;
+  std::string reason;
+};
+
+struct OverrideLoadResult final {
+  std::vector<std::string> texts;
+  std::optional<OverrideLoadError> error;
+};
+
+static char path_list_delimiter_for_platform() {
+#if defined(_WIN32)
+  return ';';
+#else
+  return ':';
+#endif
+}
+
+static std::string_view trim_ascii(std::string_view s) {
+  std::size_t begin = 0;
+  while (begin < s.size() && std::isspace(static_cast<unsigned char>(s[begin]))) begin++;
+
+  std::size_t end = s.size();
+  while (end > begin && std::isspace(static_cast<unsigned char>(s[end - 1]))) end--;
+  return s.substr(begin, end - begin);
+}
+
+static std::vector<std::string> split_override_path_list(std::string_view value, char delimiter) {
+  std::vector<std::string> out;
+  std::size_t begin = 0;
+  while (begin <= value.size()) {
+    const std::size_t end = value.find(delimiter, begin);
+    const auto piece = value.substr(begin, (end == std::string_view::npos) ? std::string_view::npos : (end - begin));
+    out.emplace_back(trim_ascii(piece));
+    if (end == std::string_view::npos) break;
+    begin = end + 1;
+  }
+  return out;
+}
+
+static std::optional<OverrideLoadError> slurp_text_file(const std::string& path,
+                                                        std::size_t index,
+                                                        std::string& out_text) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) {
+    return OverrideLoadError{ index, path, "cannot open file" };
+  }
+
+  out_text.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+  if (out_text.empty()) {
+    return OverrideLoadError{ index, path, "empty file" };
+  }
+  return std::nullopt;
+}
+
+static std::string format_override_error(const OverrideLoadError& error) {
+  std::string msg = "GPUSIM_CUDART_SHIM_PTX_OVERRIDE invalid at index ";
+  msg += std::to_string(error.index);
+  if (!error.path.empty()) {
+    msg += " path='";
+    msg += error.path;
+    msg += "'";
+  }
+  msg += ": ";
+  msg += error.reason;
+  return msg;
+}
+
+static OverrideLoadResult load_override_ptx_texts(std::string_view env_value) {
+  OverrideLoadResult out;
+  const auto paths = split_override_path_list(env_value, path_list_delimiter_for_platform());
+  out.texts.reserve(paths.size());
+
+  for (std::size_t i = 0; i < paths.size(); i++) {
+    if (paths[i].empty()) {
+      out.error = OverrideLoadError{ i, std::string(), "empty path element" };
+      return out;
+    }
+
+    std::string text;
+    if (auto error = slurp_text_file(paths[i], i, text)) {
+      out.error = std::move(error);
+      return out;
+    }
+    if (!looks_like_ptx_header(text)) {
+      out.error = OverrideLoadError{ i, paths[i], "file does not look like PTX text" };
+      return out;
+    }
+    out.texts.push_back(std::move(text));
+  }
+
+  return out;
+}
+
+static void dedupe_exact_preserve_order(std::vector<std::string>& texts) {
+  std::vector<std::string> deduped;
+  deduped.reserve(texts.size());
+  for (auto& text : texts) {
+    bool seen = false;
+    for (const auto& prior : deduped) {
+      if (prior == text) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) deduped.push_back(std::move(text));
+  }
+  texts = std::move(deduped);
+}
+
 } // namespace
 
-std::vector<std::string> FatbinRegistry::extract_ptx_texts_mvp(void* fat_cubin) {
-  std::vector<std::string> out;
-  if (!fat_cubin) return out;
+FatbinRegistry::ExtractedPtxTexts FatbinRegistry::extract_ptx_texts_mvp(void* fat_cubin) {
+  ExtractedPtxTexts result;
+  auto& out = result.ptx_texts;
+  if (!fat_cubin) return result;
 
   // Optional escape hatch: load PTX from a file.
   // This is useful when the toolchain stores PTX in a tokenized/compressed form in the fatbin.
   if (const char* p = std::getenv("GPUSIM_CUDART_SHIM_PTX_OVERRIDE")) {
     if (p && *p != '\0') {
-      std::ifstream f(p, std::ios::binary);
-      if (f) {
-        std::string s((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-        if (looks_like_ptx_header(s)) {
-          out.push_back(std::move(s));
-          return out;
-        }
+      result.ptx_override_active = true;
+      auto override = load_override_ptx_texts(p);
+      if (override.error) {
+        result.ptx_override_error = format_override_error(*override.error);
+        std::fprintf(stderr, "[gpu-sim-cudart-shim] %s\n", result.ptx_override_error.c_str());
+        return result;
       }
+      result.ptx_texts = std::move(override.texts);
+      dedupe_exact_preserve_order(result.ptx_texts);
+      return result;
     }
   }
 
@@ -286,7 +401,7 @@ std::vector<std::string> FatbinRegistry::extract_ptx_texts_mvp(void* fat_cubin) 
   }
 
   // Parse actual fatbin container: header + data entries.
-  if (static_cast<std::size_t>(end - begin) < sizeof(FatbinHeader)) return out;
+  if (static_cast<std::size_t>(end - begin) < sizeof(FatbinHeader)) return result;
   const auto* fh = reinterpret_cast<const FatbinHeader*>(begin);
   if (fh->magic != kFatbinMagic) {
     // Fallback to old heuristic if this isn't a fatbin (should be rare).
@@ -336,21 +451,22 @@ std::vector<std::string> FatbinRegistry::extract_ptx_texts_mvp(void* fat_cubin) 
   }
 
   // Deduplicate exact matches.
-  std::sort(out.begin(), out.end());
-  out.erase(std::unique(out.begin(), out.end()), out.end());
+  dedupe_exact_preserve_order(out);
 
   // Optional: dump extracted PTX(s).
   maybe_dump_texts(out, "GPUSIM_CUDART_SHIM_DUMP_PTX", ".ptx");
-  return out;
+  return result;
 }
 
 void** FatbinRegistry::register_fatbin(void* fat_cubin) {
-  auto texts = extract_ptx_texts_mvp(fat_cubin);
+  auto extracted = extract_ptx_texts_mvp(fat_cubin);
 
   const auto id = next_id_++;
   FatbinModule m;
   m.id = id;
-  m.ptx_texts = std::move(texts);
+  m.ptx_texts = std::move(extracted.ptx_texts);
+  m.ptx_override_active = extracted.ptx_override_active;
+  m.ptx_override_error = std::move(extracted.ptx_override_error);
   modules_.emplace(id, std::move(m));
 
   // Stable unique handle: allocate a small token.

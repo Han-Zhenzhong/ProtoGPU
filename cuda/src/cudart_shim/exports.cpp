@@ -366,7 +366,16 @@ GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaLaunchKernel(const void
 
     const auto* mod = fatbin_registry_singleton().lookup(ki->module_id);
     if (!mod || mod->ptx_texts.empty()) {
-      return fail(cudaErrorInvalidDeviceFunction, "cudaLaunchKernel: no PTX extracted for module");
+      std::string diag = "cudaLaunchKernel: no PTX extracted for module";
+      if (mod && mod->ptx_override_active) {
+        diag += " (source=GPUSIM_CUDART_SHIM_PTX_OVERRIDE";
+        if (!mod->ptx_override_error.empty()) {
+          diag += "; ";
+          diag += mod->ptx_override_error;
+        }
+        diag += ")";
+      }
+      return fail(cudaErrorInvalidDeviceFunction, diag);
     }
 
     const std::string entry = ki->device_name;
@@ -380,6 +389,9 @@ GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaLaunchKernel(const void
     if (!chosen_ptx) {
       std::string diag = "cudaLaunchKernel: .entry '" + entry + "' not found in extracted PTX";
       diag += " (ptx_count=" + std::to_string(mod->ptx_texts.size()) + ")";
+      if (mod->ptx_override_active) {
+        diag += " (source=GPUSIM_CUDART_SHIM_PTX_OVERRIDE)";
+      }
 
       // Best-effort diagnostics: list a few entry names we did find.
       std::vector<std::string> found;

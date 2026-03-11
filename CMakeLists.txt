@@ -123,6 +123,16 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-cudart-shim-smoke-tests PRIVATE gpu-sim-cudart-shim)
   add_test(NAME gpu-sim-cudart-shim-smoke-tests COMMAND gpu-sim-cudart-shim-smoke-tests)
 
+  add_executable(gpu-sim-cudart-shim-ptx-override-tests
+    cuda/src/cudart_shim/fatbin_registry.cpp
+    cuda/src/cudart_shim/ptx_entry_validate.cpp
+    tests/cudart_shim_ptx_override_tests.cpp
+  )
+  target_include_directories(gpu-sim-cudart-shim-ptx-override-tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
+  )
+  add_test(NAME gpu-sim-cudart-shim-ptx-override-tests COMMAND gpu-sim-cudart-shim-ptx-override-tests)
+
   # Streaming demo (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
   add_executable(gpu-sim-cudart-shim-streaming-demo
     cuda/demo/streaming_cudac_demo.cpp
@@ -151,6 +161,20 @@ if (BUILD_TESTING)
                    ${CMAKE_BINARY_DIR}
     )
     set_tests_properties(gpu-sim-cudart-shim-demo-integration PROPERTIES
+      PASS_REGULAR_EXPRESSION "OK"
+      SKIP_RETURN_CODE 125
+    )
+
+    add_test(
+      NAME gpu-sim-cudart-shim-multi-ptx-demo-integration
+      COMMAND ${CMAKE_COMMAND} -E env
+              GPUSIM_TEST_SKIP_RC=125
+              GPUSIM_CUDART_SHIM_LOG=0
+              CONFIG=$<CONFIG>
+              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_multi_ptx_demo_integration.sh
+                   ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(gpu-sim-cudart-shim-multi-ptx-demo-integration PROPERTIES
       PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )

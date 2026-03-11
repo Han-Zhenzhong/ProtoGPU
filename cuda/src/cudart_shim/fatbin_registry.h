@@ -12,6 +12,8 @@ using ModuleId = std::uint64_t;
 struct FatbinModule final {
   ModuleId id = 0;
   std::vector<std::string> ptx_texts;
+  bool ptx_override_active = false;
+  std::string ptx_override_error;
 };
 
 class FatbinRegistry final {
@@ -23,12 +25,18 @@ public:
   const FatbinModule* lookup_by_handle(void** handle) const;
 
 private:
+  struct ExtractedPtxTexts final {
+    std::vector<std::string> ptx_texts;
+    bool ptx_override_active = false;
+    std::string ptx_override_error;
+  };
+
   ModuleId next_id_ = 1;
   std::unordered_map<ModuleId, FatbinModule> modules_;
   std::unordered_map<void**, ModuleId> handle_to_id_;
 
   // TODO(M4): Robust fatbin -> PTX extraction/decoding (tokenized/compressed variants).
-  static std::vector<std::string> extract_ptx_texts_mvp(void* fat_cubin);
+  static ExtractedPtxTexts extract_ptx_texts_mvp(void* fat_cubin);
 };
 
 } // namespace gpusim_cudart_shim
