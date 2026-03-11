@@ -4,31 +4,31 @@ set -e
 echo "[pre-commit] Running checks..."
 
 # 只检查 staged 的文件
-FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cc|cpp|cxx|h|hpp)$' || true)
+CPP_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cc|cpp|cxx|h|hpp)$' || true)
 
-if [ -z "$FILES" ]; then
-  echo "[pre-commit] No C++ files to check."
+if [ -z "$CPP_FILES" ]; then
+  echo "[pre-commit] No C/C++ files to check."
   exit 0
 fi
 
 # 1. 检查是否有 CRLF（防止 ^M 回流）
-echo "[pre-commit] Checking line endings (LF only)..."
-if git diff --cached --check | grep -E "CRLF"; then
+echo "[pre-commit] Checking line endings in staged C/C++ files (LF only)..."
+if git diff --cached -- $CPP_FILES | grep -E "CRLF"; then
   echo "❌ CRLF line endings detected. Please convert to LF."
   exit 1
 fi
 
 # 2. 禁止 TAB（除非你们允许）
-echo "[pre-commit] Checking tabs..."
-if git diff --cached | grep -nP '^\+.*\t'; then
-  echo "❌ TAB detected. Please use spaces."
+echo "[pre-commit] Checking tabs in staged C/C++ files..."
+if git diff --cached -- $CPP_FILES | grep -nP '^\+.*\t'; then
+  echo "❌ TAB detected in staged C/C++ files. Please use spaces."
   exit 1
 fi
 
 # 3. clang-format（如果存在）
 if command -v clang-format >/dev/null 2>&1; then
   echo "[pre-commit] Running clang-format..."
-  for file in $FILES; do
+  for file in $CPP_FILES; do
     clang-format -i "$file"
     git add "$file"
   done
