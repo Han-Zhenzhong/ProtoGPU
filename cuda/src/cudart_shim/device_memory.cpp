@@ -52,7 +52,6 @@ cudaError_t DeviceMemory::free(void* dev_ptr) {
   auto it = allocs_.find(p);
   if (it == allocs_.end()) return cudaErrorInvalidDevicePointer;
   allocs_.erase(it);
-  // TODO: seems there is a memory leak.
   return cudaSuccess;
 }
 
