@@ -178,6 +178,20 @@ if (BUILD_TESTING)
       PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )
+
+    add_test(
+      NAME gpu-sim-cudart-shim-warp-reduce-add-demo-integration
+      COMMAND ${CMAKE_COMMAND} -E env
+              GPUSIM_TEST_SKIP_RC=125
+              GPUSIM_CUDART_SHIM_LOG=0
+              CONFIG=$<CONFIG>
+              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_warp_reduce_add_demo_cu.sh
+                   ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(gpu-sim-cudart-shim-warp-reduce-add-demo-integration PROPERTIES
+      PASS_REGULAR_EXPRESSION "OK"
+      SKIP_RETURN_CODE 125
+    )
   endif()
 
   add_executable(gpu-sim-inst-desc-tests

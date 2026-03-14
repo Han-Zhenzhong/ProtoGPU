@@ -26,6 +26,18 @@
     },
     {
       "ptx_opcode": "mov",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "imm"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "mov"
+    },
+    {
+      "ptx_opcode": "mov",
       "type_mod": "u64",
       "operand_kinds": ["reg", "reg"],
       "ir_op": "mov"
@@ -49,9 +61,21 @@
       "ir_op": "mov"
     },
     {
+      "ptx_opcode": "cvt",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "cvt"
+    },
+    {
       "ptx_opcode": "add",
       "type_mod": "u32",
       "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "imm"],
       "ir_op": "add"
     },
     {
@@ -62,14 +86,32 @@
     },
     {
       "ptx_opcode": "add",
+      "type_mod": "s32",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
       "type_mod": "u64",
       "operand_kinds": ["reg", "reg", "reg"],
       "ir_op": "add"
     },
     {
       "ptx_opcode": "add",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
       "type_mod": "s64",
       "operand_kinds": ["reg", "reg", "reg"],
+      "ir_op": "add"
+    },
+    {
+      "ptx_opcode": "add",
+      "type_mod": "s64",
+      "operand_kinds": ["reg", "reg", "imm"],
       "ir_op": "add"
     },
     {
@@ -149,6 +191,12 @@
       "type_mod": "f32",
       "operand_kinds": ["reg", "reg", "reg", "imm"],
       "ir_op": "fma"
+    },
+    {
+      "ptx_opcode": "warp_reduce_add",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg"],
+      "ir_op": "warp_reduce_add"
     },
     {
       "ptx_opcode": "setp",

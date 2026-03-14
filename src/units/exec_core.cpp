@@ -182,6 +182,37 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
     r.progressed = true;
     return r;
   }
+  case MicroOpOp::Cvt: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 1) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "CVT expects 1 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    if (uop.outputs[0].type != ValueType::F32 || uop.inputs[0].type != ValueType::U32) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_TYPE", "CVT only supports u32->f32 in this milestone", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto src_bits = read_operand_lane(uop.inputs[0], warp, lane);
+      if (!src_bits.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      const auto src_u32 = static_cast<std::uint32_t>(*src_bits);
+      const float out_f32 = static_cast<float>(src_u32);
+      write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(f32_to_bits(out_f32)));
+    }
+
+    obs.counter("uop.exec.cvt.f32.u32");
+    r.progressed = true;
+    return r;
+  }
   case MicroOpOp::Add: {
     if (uop.outputs.size() != 1 || uop.inputs.size() != 2) {
       r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "ADD expects 2 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
@@ -327,6 +358,40 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
       write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(f32_to_bits(out)));
     }
     obs.counter("uop.exec.fma.f32");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::WarpReduceAdd: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 1) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "WARP_REDUCE_ADD expects 1 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+    if (uop.attrs.type != ValueType::F32) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_TYPE", "WARP_REDUCE_ADD only supports f32 in this milestone", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    float sum = 0.0f;
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      auto v_bits = read_operand_lane(uop.inputs[0], warp, lane);
+      if (!v_bits.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+      sum += f32_from_bits(static_cast<std::uint32_t>(*v_bits));
+    }
+
+    const auto sum_bits = static_cast<std::uint64_t>(f32_to_bits(sum));
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+      write_reg_lane(uop.outputs[0], warp, lane, sum_bits);
+    }
+
+    obs.counter("uop.exec.warp_reduce_add.f32");
     r.progressed = true;
     return r;
   }

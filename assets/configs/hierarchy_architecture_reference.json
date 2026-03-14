@@ -1,0 +1,154 @@
+{
+    "architecture": {
+        "name": "SM_70 Programmer-Visible Logical Hardware",
+        "isa_target": "sm_70",
+        "description": "Logical GPU hardware model exposed to CUDA programmers. Physical implementation details that cannot be directly controlled are intentionally hidden.",
+        "notes": [
+            "This view keeps execution, memory, and synchronization concepts that programmers can reason about or influence.",
+            "Internal cluster topology, warp scheduler micro-policy, cache fabric wiring, and exact execution-pipeline counts are hidden implementation details."
+        ]
+    },
+    "programmer_visible_hierarchy": {
+        "host_device_boundary": {
+            "name": "Host <-> Device Boundary",
+            "components": [
+                {
+                    "name": "Host CPU",
+                    "role": "Launches kernels, manages streams, performs memory allocation, and initiates transfers."
+                },
+                {
+                    "name": "GPU Device",
+                    "role": "Executes kernels and owns device-visible memory spaces."
+                },
+                {
+                    "name": "Host-Device Transfer Path",
+                    "role": "Logical path for cudaMemcpy, unified memory migration, and peer-visible transfers. The exact physical bus or bridge is hidden."
+                }
+            ]
+        },
+        "execution_hierarchy": {
+            "kernel": {
+                "role": "A function launched on the GPU."
+            },
+            "grid": {
+                "role": "A kernel launch instance composed of many thread blocks."
+            },
+            "thread_block": {
+                "role": "A programmer-defined group of threads that can synchronize and share per-block shared memory.",
+                "programmer_controls": [
+                    "block dimensions",
+                    "dynamic shared memory size",
+                    "cooperative work partitioning within the block"
+                ]
+            },
+            "warp": {
+                "size": 32,
+                "role": "The main SIMT execution group visible to programmers for divergence, ballots, shuffles, and warp-level synchronization."
+            },
+            "thread": {
+                "role": "The scalar programming context with its own registers, local state, and thread indices."
+            }
+        },
+        "logical_compute_resources": {
+            "sm": {
+                "role": "The logical compute target that runs resident thread blocks and their warps.",
+                "programmer_can_influence": [
+                    "occupancy via register usage",
+                    "occupancy via shared memory usage",
+                    "parallelism via grid and block sizing"
+                ],
+                "hidden_details": [
+                    "internal warp scheduler selection policy",
+                    "dispatch timing",
+                    "execution subpartition layout"
+                ]
+            },
+            "standard_compute_pipelines": {
+                "role": "General arithmetic, logical, address, and load/store execution resources used by normal CUDA instructions.",
+                "visibility": "Programmers use them through instructions but do not directly control pipeline routing."
+            },
+            "tensor_core_operations": {
+                "role": "Matrix-acceleration capability exposed through WMMA or MMA instructions.",
+                "visibility": "Programmers can target this capability explicitly, but exact hardware scheduling remains hidden."
+            }
+        },
+        "memory_spaces": {
+            "registers": {
+                "scope": "per thread",
+                "role": "Fastest logical storage for thread-private values.",
+                "programmer_can_influence": [
+                    "register pressure through code structure",
+                    "occupancy trade-offs caused by register use"
+                ]
+            },
+            "shared_memory": {
+                "scope": "per thread block on an SM",
+                "role": "Programmer-managed on-chip memory for communication and data reuse within a block.",
+                "programmer_can_influence": [
+                    "layout",
+                    "size",
+                    "bank-conflict behavior via access pattern"
+                ]
+            },
+            "local_memory": {
+                "scope": "per thread logical address space",
+                "role": "Holds thread-private data that does not fit in registers or has address-taken semantics."
+            },
+            "global_memory": {
+                "scope": "device-wide",
+                "role": "Main device memory visible to all threads and the host through API operations.",
+                "programmer_can_influence": [
+                    "coalescing behavior via access pattern",
+                    "data layout",
+                    "allocation lifetime"
+                ]
+            },
+            "constant_memory": {
+                "scope": "device-wide read-only",
+                "role": "Read-only memory space optimized for broadcast-like access patterns."
+            },
+            "texture_surface_memory": {
+                "scope": "device-wide specialized memory interfaces",
+                "role": "Read or read-write access paths exposed through texture or surface APIs. Exact cache hierarchy is hidden."
+            },
+            "host_memory": {
+                "scope": "system-wide",
+                "role": "CPU-visible memory that can participate in host-device transfers, mapping, or unified-memory workflows."
+            }
+        },
+        "synchronization_and_communication": {
+            "block_level": {
+                "name": "Block Synchronization",
+                "role": "Threads in a block can synchronize and communicate through shared memory."
+            },
+            "warp_level": {
+                "name": "Warp Synchronization",
+                "role": "Threads in a warp can coordinate through warp intrinsics and warp-scope synchronization."
+            },
+            "device_memory_ordering": {
+                "name": "Fences and Atomics",
+                "role": "Programmers can control visibility and ordering through atomics and memory fence instructions."
+            },
+            "streams_and_events": {
+                "name": "Asynchronous Execution Control",
+                "role": "Programmers can orchestrate overlap, ordering, and dependency between kernels and copies using streams and events."
+            }
+        }
+    },
+    "hidden_implementation_details": [
+        "GPC/TPC physical hierarchy",
+        "exact number and topology of warp schedulers",
+        "scoreboard internals",
+        "L1/L2 fabric routing details",
+        "memory controller topology",
+        "on-chip bus or bridge organization",
+        "exact counts of arithmetic pipelines unless exposed by an API contract"
+    ],
+    "summary_hierarchy": [
+        "Host launches kernels and manages transfers.",
+        "Kernel -> Grid -> Thread Block -> Warp -> Thread is the main execution hierarchy visible to programmers.",
+        "SM is the logical execution target for resident blocks, but its internal scheduling policy is hidden.",
+        "Registers, shared, local, global, constant, texture/surface, and host memory are the main programmer-visible memory spaces.",
+        "Synchronization is exposed at warp, block, and memory-ordering levels through CUDA primitives."
+    ]
+}

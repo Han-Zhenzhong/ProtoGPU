@@ -26,6 +26,22 @@
     },
     {
       "opcode": "mov",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mov",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mov",
       "type_mod": "u64",
       "operand_kinds": ["reg", "reg"],
       "uops": [
@@ -49,9 +65,25 @@
       ]
     },
     {
+      "opcode": "cvt",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "CVT", "in": [1], "out": [0] }
+      ]
+    },
+    {
       "opcode": "add",
       "type_mod": "u32",
       "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
+      "type_mod": "u32",
+      "operand_kinds": ["reg", "reg", "imm"],
       "uops": [
         { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
       ]
@@ -66,6 +98,14 @@
     },
     {
       "opcode": "add",
+      "type_mod": "s32",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
       "type_mod": "u64",
       "operand_kinds": ["reg", "reg", "reg"],
       "uops": [
@@ -74,8 +114,24 @@
     },
     {
       "opcode": "add",
+      "type_mod": "u64",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
       "type_mod": "s64",
       "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
+      "type_mod": "s64",
+      "operand_kinds": ["reg", "reg", "imm"],
       "uops": [
         { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
       ]
@@ -190,6 +246,22 @@
       "operand_kinds": ["reg", "reg", "reg", "imm"],
       "uops": [
         { "kind": "EXEC", "op": "FMA", "in": [1, 2, 3], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "warp_reduce_add",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "WARP_REDUCE_ADD", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "warp_reduce_add",
+      "type_mod": "",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "WARP_REDUCE_ADD", "in": [1], "out": [0] }
       ]
     },
     {

@@ -116,6 +116,15 @@ Operand parse_operand(std::string tok) {
         return o;
       }
     }
+    if (tok.size() >= 2 && tok[1] == 'f') {
+      auto num = tok.substr(2);
+      if (!num.empty() && std::all_of(num.begin(), num.end(), [](unsigned char ch) { return std::isdigit(ch); })) {
+        o.kind = OperandKind::Reg;
+        o.type = ValueType::F32;
+        o.reg_id = std::stoll(num);
+        return o;
+      }
+    }
   }
   if (tok[0] == '-' || std::isdigit(static_cast<unsigned char>(tok[0]))) {
     o.kind = OperandKind::Imm;
@@ -150,7 +159,7 @@ TokenizedPtxInst tokenize_inst_line(const std::string& raw, const std::string& f
   inst.ptx_opcode = parts[0];
   for (std::size_t k = 1; k < parts.size(); k++) {
     const auto& m = parts[k];
-    if (m == "u32" || m == "s32" || m == "u64" || m == "s64" || m == "f32") {
+    if (m == "u32" || m == "s32" || m == "b32" || m == "u64" || m == "s64" || m == "b64" || m == "f32") {
       inst.mods.type_mod = m;
     } else if (m == "global" || m == "shared" || m == "local" || m == "const" || m == "param") {
       inst.mods.space = m;
@@ -266,7 +275,7 @@ InstRecord parse_inst_line(const std::string& raw, std::int64_t line_no) {
   inst.opcode = parts[0];
   for (std::size_t k = 1; k < parts.size(); k++) {
     const auto& m = parts[k];
-    if (m == "u32" || m == "s32" || m == "u64" || m == "s64" || m == "f32") {
+    if (m == "u32" || m == "s32" || m == "b32" || m == "u64" || m == "s64" || m == "b64" || m == "f32") {
       inst.mods.type_mod = m;
     } else if (m == "global" || m == "shared" || m == "local" || m == "const" || m == "param") {
       inst.mods.space = m;

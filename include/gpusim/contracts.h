@@ -104,10 +104,12 @@ enum class MicroOpKind : std::uint8_t { Exec, Control, Mem };
 
 enum class MicroOpOp : std::uint16_t {
   Mov,
+  Cvt,
   Add,
   Mul,
   Shl,
   Fma,
+  WarpReduceAdd,
   Setp,
   Ld,
   St,
