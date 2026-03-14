@@ -1,6 +1,6 @@
-# CUDA Runtime Shim user guide (run `cuda/demo/demo` on gpu-sim)
+# CUDA Runtime Shim user guide (run `cuda/demo/demo` on ProtoGPU)
 
-This doc explains how to run the clang-built CUDA host demo against gpu-sim via the CUDA Runtime shim.
+This doc explains how to run the clang-built CUDA host demo against ProtoGPU via the CUDA Runtime shim.
 
 Scope:
 - MVP: Linux/WSL, `cuda/demo/demo` loads `libcudart.so.12` from this repo build.

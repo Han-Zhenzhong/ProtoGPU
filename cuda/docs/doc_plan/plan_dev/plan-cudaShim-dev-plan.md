@@ -6,7 +6,7 @@ Inputs:
 - Dev guide: `cuda/docs/doc_dev/cuda-shim-dev.md`
 
 Target outcome:
-- `cuda/demo/demo` runs against gpu-sim via a shim library named `libcudart.so.12` (Linux MVP).
+- `cuda/demo/demo` runs against ProtoGPU via a shim library named `libcudart.so.12` (Linux MVP).
 - No workload JSON involved.
 
 ---
@@ -19,7 +19,7 @@ Hard requirements (must hold before calling MVP “done”):
 - Kernel identity: hostFun→deviceName from `__cudaRegisterFunction` is authoritative; PTX must contain `.entry deviceName`.
 - Launch config support is complete from day 1: `grid/block/shared/stream`.
 - Arg packing uses PTX `.param` layout; values come from host `kernelParams`.
-- Device pointers are gpu-sim `DevicePtr` numeric values; no tagging.
+- Device pointers are ProtoGPU `DevicePtr` numeric values; no tagging.
 - Stream semantics: same-stream FIFO; `cudaDeviceSynchronize` drains all.
 
 Non-goals (MVP):
@@ -95,11 +95,11 @@ Non-goals (MVP):
 1) Implement `device_memory.{h,cpp}`:
    - `cudaMalloc`: `DevicePtr p = rt.device_malloc(bytes, align)`; return `reinterpret_cast<void*>(static_cast<uintptr_t>(p))`.
    - Track `{bytes, align}` in `alloc_map[p]`.
-   - `cudaFree`: delete from map; (if gpu-sim exposes device free later, call it; otherwise keep map-only for MVP).
+   - `cudaFree`: delete from map; (if ProtoGPU exposes device free later, call it; otherwise keep map-only for MVP).
 2) Implement `cudaMemcpy`:
    - Decode device pointers back to `DevicePtr`.
    - Validate allocation exists and copy range in-bounds.
-   - Route copy through gpu-sim runtime memory helpers.
+   - Route copy through ProtoGPU runtime memory helpers.
 
 ### Validation gate
 - New unit test (or small harness) allocates device memory, writes H2D, reads D2H, compares bytes.
@@ -186,7 +186,7 @@ Non-goals (MVP):
 
 ### Steps
 1) Implement `kernel_args_pack.{h,cpp}`:
-   - parse PTX text tokens via gpu-sim Frontend
+   - parse PTX text tokens via ProtoGPU Frontend
    - bind kernel by `deviceName`
    - build `KernelArgs.layout` from `KernelTokens.params`
    - allocate blob size `max(offset+size)`

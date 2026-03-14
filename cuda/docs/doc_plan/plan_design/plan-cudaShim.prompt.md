@@ -1,8 +1,8 @@
-# CUDA Runtime Shim (cudart) — Design Plan (gpu-sim)
+# CUDA Runtime Shim (cudart) — Design Plan (ProtoGPU)
 
 ## 0) Goal
 
-Build a CUDA runtime shim that lets a host program compiled by clang/nvcc (e.g. `cuda/demo/demo`) run unmodified while redirecting CUDA runtime calls into `gpu-sim`.
+Build a CUDA runtime shim that lets a host program compiled by clang/nvcc (e.g. `cuda/demo/demo`) run unmodified while redirecting CUDA runtime calls into `ProtoGPU`.
 
 Key acceptance criteria:
 - Host binary dynamically links against a shim named like `libcudart.so.12` (platform equivalent) and runs.
@@ -106,7 +106,7 @@ Implement `FatbinRegistry::extract_ptx_texts(fatCubin)`.
 Strategy:
 1) Detect clang fatbin container format used by current demo.
 2) Parse enough to extract embedded PTX text sections.
-3) Store PTX text verbatim for feeding into gpu-sim runtime.
+3) Store PTX text verbatim for feeding into ProtoGPU runtime.
 
 Incremental approach:
 - Start with “known-good minimal parser” for the demo’s format.
@@ -174,23 +174,23 @@ Simplest scheduler:
 
 ### 8.1 Device pointers
 Create a `DevicePtr` concept owned by shim:
-- Stores gpu-sim global address (e.g., base address in `AddrSpaceManager`).
+- Stores ProtoGPU global address (e.g., base address in `AddrSpaceManager`).
 - Returned to host as an opaque pointer-like value.
 
 ### 8.2 Allocation
 `cudaMalloc`:
-- allocate in gpu-sim global address space.
+- allocate in ProtoGPU global address space.
 - record allocation size; maintain mapping `void* (opaque) → {base, size}`.
 
 `cudaFree`:
-- remove mapping; optionally free in gpu-sim.
+- remove mapping; optionally free in ProtoGPU.
 
 ### 8.3 Memcpy
-- `H2D`: write bytes into gpu-sim global.
-- `D2H`: read bytes from gpu-sim global.
+- `H2D`: write bytes into ProtoGPU global.
+- `D2H`: read bytes from ProtoGPU global.
 - `D2D`: global→global copy.
 
-If gpu-sim global reads are sparse, missing bytes should read as 0 per earlier decision.
+If ProtoGPU global reads are sparse, missing bytes should read as 0 per earlier decision.
 
 ## 9) Assets loading policy (env override + embedded fallback)
 
@@ -235,7 +235,7 @@ Add a new target (TODO: choose target name, platform-specific output):
 - Windows: `cudart64_120.dll` (or toolchain-expected DLL name)
 
 Link against:
-- gpu-sim core libraries
+- ProtoGPU core libraries
 
 Export:
 - Ensure C ABI symbol visibility for exported cudart functions.
@@ -264,7 +264,7 @@ Export:
 1) Scaffold shim library target + export minimal error APIs.
 2) Implement `__cudaRegisterFatBinary` / `__cudaRegisterFunction` registries.
 3) Implement fatbin→PTX extraction for demo’s format.
-4) Implement `cudaMalloc/cudaFree/cudaMemcpy` routing to gpu-sim.
+4) Implement `cudaMalloc/cudaFree/cudaMemcpy` routing to ProtoGPU.
 5) Implement `__cudaPush/PopCallConfiguration` + `cudaLaunchKernel`.
 6) Reuse GPU-sim PTX parser to derive `.param` layout and pack `kernelParams`.
 7) Implement stream FIFO and synchronization APIs.

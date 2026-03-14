@@ -5,8 +5,8 @@ Design an additive extension to the existing GPUSIM_CUDART_SHIM_PTX_OVERRIDE flo
 **Steps**
 1. Define the external contract for multi-file override in the shim. Specify that GPUSIM_CUDART_SHIM_PTX_OVERRIDE keeps working for one path and additionally accepts multiple PTX paths in one value. Decide and document the path-list delimiter policy up front: recommended is platform-native list semantics (`:` on Linux/WSL, `;` on Windows) to match established environment-variable expectations. Also define ordering and precedence: listed files are loaded in order, exact duplicate PTX texts may still be deduplicated later by the existing registry logic, and kernel lookup remains first PTX containing the requested entry.
 2. Define error-handling semantics before code changes because this affects both user experience and tests. Recommended rule: once GPUSIM_CUDART_SHIM_PTX_OVERRIDE is set, the shim should treat it as authoritative and fail fast if any listed file is unreadable, empty, or not PTX-like instead of silently falling back to fatbin extraction. This aligns better with EnvOrEmbeddedAssetsProvider fail-fast behavior and avoids ambiguous launches. This step blocks steps 3, 5, 6, and 7.
-3. Refactor PTX override ingestion in /home/hanzz/gpu-sim/cuda/src/cudart_shim/fatbin_registry.cpp. Split the current single-file branch inside FatbinRegistry::extract_ptx_texts_mvp into small helpers: parse env value into ordered paths, slurp each file, validate header shape with looks_like_ptx_header, append all valid PTX texts into the existing output vector, and surface enough context for diagnostics (env name, offending path, index in list). Keep the existing fatbin scanning path untouched when the env var is absent. Depends on 1 and 2.
-4. Confirm and preserve kernel resolution semantics in /home/hanzz/gpu-sim/cuda/src/cudart_shim/exports.cpp. The current cudaLaunchKernel path already iterates FatbinModule::ptx_texts and selects the first PTX containing the requested entry before parsing/binding. The design should explicitly keep that behavior, but improve diagnostics to mention override path count and possibly source-path order if resolution fails or duplicate entries create ambiguity. Depends on 3.
+3. Refactor PTX override ingestion in /home/hanzz/ProtoGPU/cuda/src/cudart_shim/fatbin_registry.cpp. Split the current single-file branch inside FatbinRegistry::extract_ptx_texts_mvp into small helpers: parse env value into ordered paths, slurp each file, validate header shape with looks_like_ptx_header, append all valid PTX texts into the existing output vector, and surface enough context for diagnostics (env name, offending path, index in list). Keep the existing fatbin scanning path untouched when the env var is absent. Depends on 1 and 2.
+4. Confirm and preserve kernel resolution semantics in /home/hanzz/ProtoGPU/cuda/src/cudart_shim/exports.cpp. The current cudaLaunchKernel path already iterates FatbinModule::ptx_texts and selects the first PTX containing the requested entry before parsing/binding. The design should explicitly keep that behavior, but improve diagnostics to mention override path count and possibly source-path order if resolution fails or duplicate entries create ambiguity. Depends on 3.
 5. Decide whether additive public API parity is required outside the shim. Because the user requested runtime/CLI coverage, evaluate a minimal parity surface rather than a broad redesign: add optional helper overloads that accept multiple PTX file paths or PTX texts only if they materially help tests, demos, or non-shim usage. Do not redesign Runtime around multi-module state unless discovery shows a real need. Preserve all current single-file Runtime methods and gpu-sim-cli flags. This can run in parallel with 6 after 3, but should be scoped tightly.
 6. Update script and demo contract for the new format. Adjust Linux shell helpers and demo runners so they can either pass through an already-list-valued GPUSIM_CUDART_SHIM_PTX_OVERRIDE or compose one from multiple arguments in a backward-compatible way. Update usage text and examples in the setup/demo scripts to show both single-file and multi-file forms. Depends on 1, 2, and 3.
 7. Expand automated coverage in layers.
@@ -17,23 +17,23 @@ Design an additive extension to the existing GPUSIM_CUDART_SHIM_PTX_OVERRIDE flo
 9. Verify end-to-end with both regression and feature-specific checks. Re-run existing single-file shim/demo flows unchanged, then run new multi-file scenarios with kernels split across PTX files and with malformed path lists to validate diagnostics. Depends on 4, 6, 7, and 8.
 
 **Relevant files**
-- /home/hanzz/gpu-sim/cuda/src/cudart_shim/fatbin_registry.cpp — primary design target; current single-file GPUSIM_CUDART_SHIM_PTX_OVERRIDE handling lives in FatbinRegistry::extract_ptx_texts_mvp.
-- /home/hanzz/gpu-sim/cuda/src/cudart_shim/fatbin_registry.h — confirms FatbinModule already stores std::vector<std::string> ptx_texts, so ingestion can expand without changing the module container shape.
-- /home/hanzz/gpu-sim/cuda/src/cudart_shim/exports.cpp — current cudaLaunchKernel already scans mod->ptx_texts and binds the requested entry from the first matching PTX text.
-- /home/hanzz/gpu-sim/cuda/src/cudart_shim/assets_provider.cpp — reference pattern for fail-fast environment-driven asset loading and helpful consistency target for override semantics.
-- /home/hanzz/gpu-sim/scripts/setup_cudart_shim_running_env.sh — current helper only accepts one override path argument; likely needs argument/usage redesign.
-- /home/hanzz/gpu-sim/scripts/run_cuda_shim_demo_integration.sh — current integration runner assumes one PTX override path and is the natural regression/feature verification entry point.
-- /home/hanzz/gpu-sim/scripts/run_cuda_shim_streaming_demo_cu.sh — another script entry point that references the override variable and should stay behaviorally aligned.
-- /home/hanzz/gpu-sim/cuda/docs/doc_user/cuda-shim.md — main user doc for the shim environment variables; must define the new multi-file contract.
-- /home/hanzz/gpu-sim/cuda/demo/README.md — demo guidance currently recommends one explicit PTX text override.
-- /home/hanzz/gpu-sim/cuda/demo/README.zh-CN.md — localized demo guidance that mirrors the one-file behavior.
-- /home/hanzz/gpu-sim/scripts/README.md — script README references the current override usage.
-- /home/hanzz/gpu-sim/scripts/README.zh-CN.md — localized script README references the current override usage.
-- /home/hanzz/gpu-sim/src/runtime/runtime.cpp — optional additive parity surface if multi-PTX helpers are introduced for public Runtime APIs.
-- /home/hanzz/gpu-sim/include/gpusim/runtime.h — optional additive public declarations if Runtime gains helper overloads for multiple PTX inputs.
-- /home/hanzz/gpu-sim/src/apps/cli/main.cpp — optional CLI parity surface only if the design chooses to expose multi-PTX input outside the shim.
-- /home/hanzz/gpu-sim/tests/cudart_shim_memory_smoke_tests.cpp — existing shim smoke infrastructure; may stay unchanged but is a nearby place to assess coverage gaps.
-- /home/hanzz/gpu-sim/tests/public_api_in_memory_tests.cpp — reference for lightweight public API tests if additive Runtime multi-text helpers are introduced.
+- /home/hanzz/ProtoGPU/cuda/src/cudart_shim/fatbin_registry.cpp — primary design target; current single-file GPUSIM_CUDART_SHIM_PTX_OVERRIDE handling lives in FatbinRegistry::extract_ptx_texts_mvp.
+- /home/hanzz/ProtoGPU/cuda/src/cudart_shim/fatbin_registry.h — confirms FatbinModule already stores std::vector<std::string> ptx_texts, so ingestion can expand without changing the module container shape.
+- /home/hanzz/ProtoGPU/cuda/src/cudart_shim/exports.cpp — current cudaLaunchKernel already scans mod->ptx_texts and binds the requested entry from the first matching PTX text.
+- /home/hanzz/ProtoGPU/cuda/src/cudart_shim/assets_provider.cpp — reference pattern for fail-fast environment-driven asset loading and helpful consistency target for override semantics.
+- /home/hanzz/ProtoGPU/scripts/setup_cudart_shim_running_env.sh — current helper only accepts one override path argument; likely needs argument/usage redesign.
+- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_demo_integration.sh — current integration runner assumes one PTX override path and is the natural regression/feature verification entry point.
+- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_streaming_demo_cu.sh — another script entry point that references the override variable and should stay behaviorally aligned.
+- /home/hanzz/ProtoGPU/cuda/docs/doc_user/cuda-shim.md — main user doc for the shim environment variables; must define the new multi-file contract.
+- /home/hanzz/ProtoGPU/cuda/demo/README.md — demo guidance currently recommends one explicit PTX text override.
+- /home/hanzz/ProtoGPU/cuda/demo/README.zh-CN.md — localized demo guidance that mirrors the one-file behavior.
+- /home/hanzz/ProtoGPU/scripts/README.md — script README references the current override usage.
+- /home/hanzz/ProtoGPU/scripts/README.zh-CN.md — localized script README references the current override usage.
+- /home/hanzz/ProtoGPU/src/runtime/runtime.cpp — optional additive parity surface if multi-PTX helpers are introduced for public Runtime APIs.
+- /home/hanzz/ProtoGPU/include/gpusim/runtime.h — optional additive public declarations if Runtime gains helper overloads for multiple PTX inputs.
+- /home/hanzz/ProtoGPU/src/apps/cli/main.cpp — optional CLI parity surface only if the design chooses to expose multi-PTX input outside the shim.
+- /home/hanzz/ProtoGPU/tests/cudart_shim_memory_smoke_tests.cpp — existing shim smoke infrastructure; may stay unchanged but is a nearby place to assess coverage gaps.
+- /home/hanzz/ProtoGPU/tests/public_api_in_memory_tests.cpp — reference for lightweight public API tests if additive Runtime multi-text helpers are introduced.
 
 **Verification**
 1. Validate regression for current behavior: run the existing shim demo/integration flow with a single GPUSIM_CUDART_SHIM_PTX_OVERRIDE path and confirm no behavior change.

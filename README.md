@@ -1,4 +1,4 @@
-# gpu-sim
+# ProtoGPU
 
 > Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
@@ -23,8 +23,8 @@ This repository organizes GPU/PTX VM design and development materials with a “
   - Uses PTX 6.4 (frozen subset) and an sm70 profile as the bring-up and regression anchor; the memory baseline is No-cache + address space classification (global/shared/local/const/param).
   - Examples and notes: `cuda/demo/README.zh-CN.md`.
 
-- CUDA Runtime shim: run clang-compiled CUDA demos on gpu-sim
-  - Via a `libcudart.so.12`-compatible shim, a clang-compiled `.cu` demo host binary is redirected at runtime into the gpu-sim runtime (currently primarily targeting Linux/WSL paths).
+- CUDA Runtime shim: run clang-compiled CUDA demos on ProtoGPU
+  - Via a `libcudart.so.12`-compatible shim, a clang-compiled `.cu` demo host binary is redirected at runtime into the ProtoGPU runtime (currently primarily targeting Linux/WSL paths).
   - User guide: `cuda/docs/doc_user/cuda-shim.md`.
 
 ## Documentation layout

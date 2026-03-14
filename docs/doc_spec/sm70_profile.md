@@ -1,11 +1,11 @@
 # sm70 profile（基线）
 
-本文档定义 gpu-sim 当前阶段“硬件基线 profile”的可验证条目，用于：
+本文档定义 ProtoGPU 当前阶段“硬件基线 profile”的可验证条目，用于：
 - 约束实现目标（避免隐式假设漂移）
 - 作为回归测试与资产（PTX/ptx_isa/inst_desc）的对齐依据
 - 为后续扩展到其它 `sm_xx` 提供差异承载点
 
-> 说明：这里的 “sm70 profile” 是 gpu-sim 的工程基线配置与语义边界，并不声称是对真实 NVIDIA Volta（SM70）cycle-accurate 的完整复刻。
+> 说明：这里的 “sm70 profile” 是 ProtoGPU 的工程基线配置与语义边界，并不声称是对真实 NVIDIA Volta（SM70）cycle-accurate 的完整复刻。
 
 ---
 

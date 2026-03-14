@@ -1,6 +1,6 @@
 # tiny GPT-2 最小覆盖（M1–M4）使用说明
 
-本页面向使用者，说明：当前 gpu-sim（PTX 6.4 + sm70 功能级基线）为了 bring-up tiny GPT-2（FP32 推理）已经打通的“最小可运行闭环”，以及如何运行对应回归。
+本页面向使用者，说明：当前 ProtoGPU（PTX 6.4 + sm70 功能级基线）为了 bring-up tiny GPT-2（FP32 推理）已经打通的“最小可运行闭环”，以及如何运行对应回归。
 
 对应实现/设计文档：
 - Dev：`docs/doc_dev/tiny_gpt2/minimal_coverage_dev.md`

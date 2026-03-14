@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "gpu-sim instruction descriptor",
+  "title": "ProtoGPU instruction descriptor",
   "type": "object",
   "required": ["insts"],
   "properties": {

@@ -4,7 +4,7 @@ This document is a developer-facing implementation guide for building the CUDA R
 - Design: `cuda/docs/doc_design/cuda-shim-logical-design.md`
 - Requirements: `cuda/docs/cuda-shim-requirement.md`
 
-MVP goal: run `cuda/demo/demo` (clang-produced host binary) against gpu-sim with **no workload JSON**.
+MVP goal: run `cuda/demo/demo` (clang-produced host binary) against ProtoGPU with **no workload JSON**.
 
 ---
 
@@ -291,10 +291,10 @@ Implementation sketch:
 - Decode device pointers:
   - `DevicePtr p = static_cast<DevicePtr>(reinterpret_cast<uintptr_t>(devPtrVoid))`
 - Validate allocation existence and bounds.
-- Use gpu-sim runtime copy helpers.
+- Use ProtoGPU runtime copy helpers.
 
 Note:
-- gpu-sim currently has host buffers (`host_alloc`, `host_write`, `host_read`) and runtime memcpy helpers; pick the simplest path that avoids unnecessary host-buffer allocations.
+- ProtoGPU currently has host buffers (`host_alloc`, `host_write`, `host_read`) and runtime memcpy helpers; pick the simplest path that avoids unnecessary host-buffer allocations.
 
 ---
 
@@ -307,7 +307,7 @@ Source of truth:
 
 Validate `.entry deviceName` exists:
 - MVP: string search in PTX text.
-- Preferred: attempt to bind kernel by name using gpu-sim Binder (if bind fails → entry not found).
+- Preferred: attempt to bind kernel by name using ProtoGPU Binder (if bind fails → entry not found).
 
 ### 11.2 Pack args: `kernelParams` → `gpusim::KernelArgs`
 
@@ -328,7 +328,7 @@ Steps:
 Mismatch handling:
 - If missing argument, unsupported param type, or invalid pointer: set last error and return an error.
 
-### 11.3 Execute via gpu-sim Runtime
+### 11.3 Execute via ProtoGPU Runtime
 
 Use:
 - `gpusim::Runtime::run_ptx_kernel_with_args_text_entry_launch(ptx_text, ptxIsaJson, instDescJson, deviceName, args, launch)`
@@ -336,7 +336,7 @@ Use:
 Launch config:
 - `gpusim::LaunchConfig` contains grid/block/warp_size.
 - warp_size comes from sim config.
-- sharedMemBytes must be recorded/logged for MVP; follow-up is threading it into gpu-sim core.
+- sharedMemBytes must be recorded/logged for MVP; follow-up is threading it into ProtoGPU core.
 
 ---
 
@@ -403,7 +403,7 @@ Linux MVP run procedure:
 
 ## 15) Known follow-ups
 
-- Propagate `sharedMemBytes` into gpu-sim core by extending `gpusim::LaunchConfig`.
+- Propagate `sharedMemBytes` into ProtoGPU core by extending `gpusim::LaunchConfig`.
 - Add minimal `cudaStreamCreate/cudaStreamDestroy/cudaStreamSynchronize` if future host code requires it.
 - Improve fatbin parsing robustness and multi-module selection.
 - Add GNU ld version script if symbol versioning becomes a hard requirement on target distros.

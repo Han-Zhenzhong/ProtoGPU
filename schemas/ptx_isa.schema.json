@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "gpu-sim PTX ISA map",
+  "title": "ProtoGPU PTX ISA map",
   "type": "object",
   "required": ["insts"],
   "properties": {

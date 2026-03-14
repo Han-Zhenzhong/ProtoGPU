@@ -4,4 +4,4 @@
 
 Build and release related documentation.
 
-- [build.md](build.md): how to build gpu-sim locally (CMake), and conventions for artifacts and runtime working directories.
+- [build.md](build.md): how to build ProtoGPU locally (CMake), and conventions for artifacts and runtime working directories.

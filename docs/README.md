@@ -2,7 +2,7 @@
 
 > Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-This directory contains all documentation for `gpu-sim`.
+This directory contains all documentation for `ProtoGPU`.
 
 ## Quick links
 

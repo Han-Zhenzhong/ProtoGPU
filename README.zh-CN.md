@@ -1,4 +1,4 @@
-# gpu-sim
+# ProtoGPU
 
 本仓库以“设计与规划先行”的方式组织 GPU/PTX VM 的设计与开发材料。
 
@@ -21,8 +21,8 @@
   - 以 PTX 6.4（冻结子集）与 sm70 profile 作为 bring-up 与回归锚点；内存基线为 No-cache + 地址空间分类（global/shared/local/const/param）。
   - 示例与说明：`cuda/demo/README.md`。
 
-- CUDA Runtime shim：让 clang 编译的 CUDA demo 可执行程序接入 gpu-sim
-  - 通过 `libcudart.so.12` 兼容 shim，把 clang 编译的 `.cu` demo host binary 在运行时重定向到 gpu-sim runtime（当前以 Linux/WSL 路径为主）。
+- CUDA Runtime shim：让 clang 编译的 CUDA demo 可执行程序接入 ProtoGPU
+  - 通过 `libcudart.so.12` 兼容 shim，把 clang 编译的 `.cu` demo host binary 在运行时重定向到 ProtoGPU runtime（当前以 Linux/WSL 路径为主）。
   - 用户指南：`cuda/docs/doc_user/cuda-shim.md`。
 
 ## 文档目录说明

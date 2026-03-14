@@ -77,7 +77,7 @@ stats (`--stats`)
 
 ## Public Runtime API (C++)
 
-If you want to embed gpu-sim as a C++ library (especially for the “in-memory PTX + in-memory JSON assets” packaging style), see:
+If you want to embed ProtoGPU as a C++ library (especially for the “in-memory PTX + in-memory JSON assets” packaging style), see:
 
 - [public_api.md](public_api.md)
 

@@ -1,6 +1,6 @@
 # Public Runtime API（C++）
 
-本页面向“把 gpu-sim 当作一个 C++ 库嵌入到自己工程里”的使用者：
+本页面向“把 ProtoGPU 当作一个 C++ 库嵌入到自己工程里”的使用者：
 
 - 不依赖仓库目录结构（无需 `assets/...` 路径）
 - 可直接传入 **PTX text** 与 **JSON assets text**（`ptx_isa` / `inst_desc`）

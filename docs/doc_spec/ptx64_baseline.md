@@ -1,11 +1,11 @@
 # PTX 6.4 baseline（冻结子集）
 
-本文档定义 gpu-sim 当前阶段的 **PTX 6.4 基线**：
+本文档定义 ProtoGPU 当前阶段的 **PTX 6.4 基线**：
 - 作为“完整仿真”对外口径的 PTX 输入约束
 - 作为 `assets/ptx/*.ptx`、`assets/ptx_isa/*.json`、`assets/inst_desc/*.json` 的对齐依据
 - 作为后续扩展到 PTX 7.x/8.x 的兼容层边界（增量目标）
 
-> 说明：gpu-sim 的前端当前以“tokenization + 映射”的方式处理 PTX；部分 header/directive 目前属于 **约定**（资产一致性），未必在代码里强制校验。
+> 说明：ProtoGPU 的前端当前以“tokenization + 映射”的方式处理 PTX；部分 header/directive 目前属于 **约定**（资产一致性），未必在代码里强制校验。
 
 ---
 
@@ -81,7 +81,7 @@
 
 ## 操作数与 `ptx_isa` 映射（冻结接口）
 
-gpu-sim 将“PTX 指令形态”与“IR 语义（inst_desc）”解耦：
+ProtoGPU 将“PTX 指令形态”与“IR 语义（inst_desc）”解耦：
 - PTX → IR：由 `assets/ptx_isa/*.json`（schema：`schemas/ptx_isa.schema.json`）定义
 - IR → uops：由 `assets/inst_desc/*.json` 定义
 

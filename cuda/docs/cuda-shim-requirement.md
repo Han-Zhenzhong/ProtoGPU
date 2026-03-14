@@ -1,6 +1,6 @@
 # CUDA runtime shim requirements
 
-This document defines the minimum requirements for implementing a CUDA Runtime (`libcudart.so.12`) shim that routes CUDA host code execution into gpu-sim.
+This document defines the minimum requirements for implementing a CUDA Runtime (`libcudart.so.12`) shim that routes CUDA host code execution into ProtoGPU.
 
 ## Scope / non-goals
 
@@ -17,14 +17,14 @@ Explicitly out of scope for MVP (can be added later):
 
 - Streams/events concurrency semantics beyond “default stream + synchronous execution”
 - Cooperative groups, dynamic parallelism, textures/surfaces, unified memory, graphs
-- JIT compilation of PTX to SASS; only PTX execution via gpu-sim
+- JIT compilation of PTX to SASS; only PTX execution via ProtoGPU
 
 ## Required `libcudart.so.12` symbols
 
 The demo binary (`cuda/demo/demo`) currently depends on the following undefined CUDA Runtime symbols:
 
 ```text
-hanzz@DESKTOP-DPLK3ES:~/gpu-sim$ nm -u cuda/demo/demo
+hanzz@DESKTOP-DPLK3ES:~/ProtoGPU$ nm -u cuda/demo/demo
                                  w _ITM_deregisterTMCloneTable
                                  w _ITM_registerTMCloneTable
                                  U __cudaPopCallConfiguration@libcudart.so.12
@@ -109,7 +109,7 @@ Required mapping:
 
 ## Launch configuration (`<<<grid, block, shared, stream>>>`)
 
-The shim must correctly supply launch dimensions to gpu-sim:
+The shim must correctly supply launch dimensions to ProtoGPU:
 
 - Launch configuration must be fully supported from the start:
      - `gridDim` (x,y,z)
@@ -124,8 +124,8 @@ Sources of truth (must support both):
 
 Required semantics:
 
-- `sharedMemBytes` must be propagated into the gpu-sim launch path (even if the current PTX does not consume it).
-     - If/when the PTX uses dynamic shared memory, gpu-sim must allocate and address it consistently with this value.
+- `sharedMemBytes` must be propagated into the ProtoGPU launch path (even if the current PTX does not consume it).
+     - If/when the PTX uses dynamic shared memory, ProtoGPU must allocate and address it consistently with this value.
 - `stream` must be respected as an execution ordering mechanism:
      - Operations enqueued to the same `cudaStream_t` execute in program order.
      - Different streams may interleave; the shim must not incorrectly reorder operations within a single stream.
@@ -164,7 +164,7 @@ Requirements:
 
 Recommended behavior:
 
-- For MVP, treat device pointers as gpu-sim `DevicePtr` values (no pointer tagging needed).
+- For MVP, treat device pointers as ProtoGPU `DevicePtr` values (no pointer tagging needed).
 - Validate copy ranges and fail fast on invalid pointers/ranges.
 
 ## Error handling and diagnostics

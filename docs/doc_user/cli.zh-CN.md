@@ -69,7 +69,7 @@ stats（`--stats`）
 
 ## Public Runtime API（C++）
 
-如果你希望把 gpu-sim 当作 C++ 库嵌入使用（尤其是“in-memory PTX + in-memory JSON assets”的打包方式），参照：
+如果你希望把 ProtoGPU 当作 C++ 库嵌入使用（尤其是“in-memory PTX + in-memory JSON assets”的打包方式），参照：
 - [Public Runtime API（中文）](public_api.zh-CN.md)
 
 该文档包含：

@@ -2,7 +2,7 @@
 
 > Chinese version: [public_api.zh-CN.md](public_api.zh-CN.md)
 
-This page is for users who want to embed gpu-sim into their own project as a C++ library:
+This page is for users who want to embed ProtoGPU into their own project as a C++ library:
 
 - No dependency on the repo directory layout (no need for `assets/...` file paths)
 - You can pass **PTX text** and **JSON assets text** (`ptx_isa` / `inst_desc`) directly

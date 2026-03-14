@@ -1,6 +1,6 @@
 # CUDA Runtime Shim（libcudart.so.12）Logical Design
 
-This document describes the logical design for a CUDA Runtime shim library that routes CUDA host code into gpu-sim.
+This document describes the logical design for a CUDA Runtime shim library that routes CUDA host code into ProtoGPU.
 
 It is derived from:
 - Requirements: `cuda/docs/cuda-shim-requirement.md`
@@ -26,7 +26,7 @@ The initial MVP target is `cuda/demo/demo` compiled by clang.
 - Kernel entry name source of truth is `__cudaRegisterFunction(... deviceName ...)` and must be validated against PTX `.entry`.
 - Argument packing:
   - values come from host `kernelParams` (from `cudaLaunchKernel`)
-  - layout comes from PTX `.param` (via gpu-sim Frontend Parser/Binder)
+  - layout comes from PTX `.param` (via ProtoGPU Frontend Parser/Binder)
 - Assets input policy:
   - environment override (`GPUSIM_CONFIG`, `GPUSIM_PTX_ISA`, `GPUSIM_INST_DESC`)
   - otherwise embedded JSON text (no default-path mode)
@@ -35,7 +35,7 @@ The initial MVP target is `cuda/demo/demo` compiled by clang.
 
 - True overlap / concurrency (single-threaded execution is acceptable).
 - Full CUDA runtime coverage beyond the required symbol list.
-- PTX JIT to SASS; only PTX interpretation via gpu-sim.
+- PTX JIT to SASS; only PTX interpretation via ProtoGPU.
 - Full fatbin format support; start with the clang format used by this repository.
 
 ---
@@ -55,7 +55,7 @@ The initial MVP target is `cuda/demo/demo` compiled by clang.
 The shim is a new shared library target that:
 
 1) Exports the required CUDA runtime symbols with a C ABI.
-2) Internally embeds and orchestrates gpu-sim runtime components:
+2) Internally embeds and orchestrates ProtoGPU runtime components:
    - PTX parsing/binding (Frontend)
    - PTX ISA mapping & instruction descriptors
    - runtime/memory helpers for host/device buffers and D2H/H2D
@@ -79,14 +79,14 @@ CUDA Runtime Shim (this design)
   |     +-- DeviceMemory (alloc map + memcpy)
   |     +-- ErrorState (per-thread last error)
   |
-  +-- gpu-sim Runtime (gpusim::Runtime)
+  +-- ProtoGPU Runtime (gpusim::Runtime)
         |
         +-- Frontend Parser/Binder
         +-- PtxIsaRegistry / DescriptorRegistry
         +-- SimtExecutor / MemUnit / AddrSpaceManager
 ```
 
-### 3.2 Key integration points in gpu-sim
+### 3.2 Key integration points in ProtoGPU
 
 MVP uses the in-memory Runtime entrypoint:
 - `gpusim::Runtime::run_ptx_kernel_with_args_text_entry_launch(ptx_text, ptxIsaJsonText, instDescJsonText, entry, args, launch)`
@@ -265,10 +265,10 @@ Validation:
 
 ### 9.3 sharedMemBytes propagation
 
-gpu-sim’s current `gpusim::LaunchConfig` has only:
+ProtoGPU’s current `gpusim::LaunchConfig` has only:
 - `grid_dim`, `block_dim`, `warp_size`
 
-MVP design requirement: sharedMemBytes must be “propagated into the gpu-sim launch path” even if not consumed.
+MVP design requirement: sharedMemBytes must be “propagated into the ProtoGPU launch path” even if not consumed.
 
 Logical design approach:
 - Introduce a shim-level `LaunchConfigEx`:
@@ -284,7 +284,7 @@ LaunchConfigEx {
 
 - For MVP, the shim:
   - validates `dynamic_shared_bytes` and logs it
-  - passes `grid_dim/block_dim/warp_size` to gpu-sim `LaunchConfig`
+  - passes `grid_dim/block_dim/warp_size` to ProtoGPU `LaunchConfig`
 
 Follow-up (recommended):
 - Extend `gpusim::LaunchConfig` to include `dynamic_shared_bytes` and thread it into Shared memory allocation.
@@ -331,10 +331,10 @@ This satisfies:
 ### 11.1 Device pointers
 
 - `cudaMalloc` returns a stable value usable as a PTX `.u64` pointer argument.
-- Internally, gpu-sim uses `gpusim::DevicePtr` (a `uint64_t`).
+- Internally, ProtoGPU uses `gpusim::DevicePtr` (a `uint64_t`).
 
 Shim representation (MVP):
-- Treat the host-visible `void*` as a direct encoding of gpu-sim `DevicePtr`.
+- Treat the host-visible `void*` as a direct encoding of ProtoGPU `DevicePtr`.
 - Internally, store allocation metadata keyed by `DevicePtr`.
 
 ```text
@@ -342,7 +342,7 @@ alloc_map: device_ptr(u64) -> { bytes: u64, align: u64 }
 ```
 
 Rationale:
-- Matches the requirement recommendation: device pointers are gpu-sim `DevicePtr` values; no additional tagging scheme is required.
+- Matches the requirement recommendation: device pointers are ProtoGPU `DevicePtr` values; no additional tagging scheme is required.
 - Keeps kernel argument packing simple: pointer params are `.u64` and receive the same `DevicePtr` numeric value.
 
 Safety notes:
@@ -352,9 +352,9 @@ Safety notes:
 ### 11.2 cudaMemcpy
 
 Support at minimum:
-- `cudaMemcpyHostToDevice`: write bytes into gpu-sim global memory at DevicePtr
-- `cudaMemcpyDeviceToHost`: read bytes from gpu-sim global memory
-- `cudaMemcpyDeviceToDevice`: copy within gpu-sim global memory
+- `cudaMemcpyHostToDevice`: write bytes into ProtoGPU global memory at DevicePtr
+- `cudaMemcpyDeviceToHost`: read bytes from ProtoGPU global memory
+- `cudaMemcpyDeviceToDevice`: copy within ProtoGPU global memory
 
 Validation:
 - Ensure source/destination pointer refers to a known allocation.
@@ -385,9 +385,9 @@ Steps:
    - Confirm PTX contains `.entry <deviceName>`.
    - If missing: fail fast with a diagnostic identifying module + deviceName.
 
-4) Build gpu-sim launch config:
+4) Build ProtoGPU launch config:
    - `LaunchConfig{ grid_dim, block_dim, warp_size }`
-   - `warp_size` is taken from the loaded `GPUSIM_CONFIG` (gpu-sim runtime config)
+   - `warp_size` is taken from the loaded `GPUSIM_CONFIG` (ProtoGPU runtime config)
 
 5) Pack args into `gpusim::KernelArgs`:
    - layout from PTX `.param`
@@ -398,7 +398,7 @@ Steps:
 
 7) Execute (MVP synchronous):
    - Call `gpusim::Runtime::run_ptx_kernel_with_args_text_entry_launch(...)`
-   - If gpu-sim returns a diagnostic, translate to a CUDA error and set last error.
+   - If ProtoGPU returns a diagnostic, translate to a CUDA error and set last error.
 
 ### 12.2 Entry validation mechanics
 
@@ -414,7 +414,7 @@ Preferred (future):
 
 ### 13.1 Source of layout
 
-Use gpu-sim Frontend:
+Use ProtoGPU Frontend:
 - Parse PTX text → module tokens
 - Bind kernel by name (`deviceName`) → `KernelTokens`
 - Use `KernelTokens.params` as `KernelArgs.layout`
@@ -432,7 +432,7 @@ For each parameter index `i`:
 Pointer parameters:
 - PTX pointer params are `.u64`.
 - Host argument is a device pointer token returned from `cudaMalloc`.
-- Packing must write the gpu-sim `DevicePtr` (u64) into blob.
+- Packing must write the ProtoGPU `DevicePtr` (u64) into blob.
 
 Design for pointer args:
 1) Read `void* host_devptr = *reinterpret_cast<void**>(kernelParams[i])`.
@@ -464,7 +464,7 @@ MVP translation table (logical):
 - missing registration / entry not found → `cudaErrorInvalidDeviceFunction`
 - unsupported fatbin format → `cudaErrorInvalidPtx`
 - invalid device pointer / memcpy range → `cudaErrorInvalidDevicePointer` (or `cudaErrorInvalidValue` if unavailable)
-- gpu-sim diag present → `cudaErrorLaunchFailure`
+- ProtoGPU diag present → `cudaErrorLaunchFailure`
 
 ### 14.3 Diagnostics
 

@@ -1,6 +1,6 @@
 # CUDA Runtime Shim Multi-GPU Scheduling — Requirements Analysis
 
-This document analyzes requirements for extending the CUDA Runtime shim to support **multi-GPU** (multi-device) host programs and to enable **multi-device scheduling semantics** on top of gpu-sim.
+This document analyzes requirements for extending the CUDA Runtime shim to support **multi-GPU** (multi-device) host programs and to enable **multi-device scheduling semantics** on top of ProtoGPU.
 
 It complements:
 - Base shim requirements: `cuda/docs/cuda-shim-requirement.md`
