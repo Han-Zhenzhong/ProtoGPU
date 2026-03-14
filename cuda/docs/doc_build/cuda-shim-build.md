@@ -1,6 +1,6 @@
 # CUDA Runtime Shim build guide (libcudart.so.12)
 
-This doc describes how to build the CUDA Runtime shim that lets `cuda/demo/demo` run on gpu-sim (no workload JSON).
+This doc describes how to build the CUDA Runtime shim that lets `cuda/demo/demo` run on ProtoGPU (no workload JSON).
 
 Prereqs:
 - CMake >= 3.20

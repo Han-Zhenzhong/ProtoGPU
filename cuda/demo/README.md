@@ -6,11 +6,11 @@ This directory provides a minimal CUDA C example (`demo.cu`) and explains:
 
 - How to set up clang 18.1.3 and CUDA Toolkit 12.x on Ubuntu 24.04
 - How to compile `demo.cu` into an executable and a PTX file
-- How to run PTX 6.4 / sm_70 on gpu-sim and validate the simulation
+- How to run PTX 6.4 / sm_70 on ProtoGPU and validate the simulation
 - Common issues and troubleshooting tips
 - Related build docs and official reference links
 
-Intended for developers who want to use a clang+CUDA toolchain with gpu-sim for PTX simulation.
+Intended for developers who want to use a clang+CUDA toolchain with ProtoGPU for PTX simulation.
 
 ## 1. Environment preparation
 
@@ -158,7 +158,7 @@ If the override env var is explicitly set and any listed PTX file is missing, em
 
 ---
 
-## 3. Run PTX 6.4 / sm_70 on gpu-sim
+## 3. Run PTX 6.4 / sm_70 on ProtoGPU
 
 Assuming you’ve built `demo.ptx` and prepared the corresponding asset files:
 
@@ -207,12 +207,52 @@ If the simulation finishes without errors, your PTX and asset configuration is c
 
 ---
 
+## 3.2 warp_reduce_add demo (split executable/PTX sources)
+
+For custom PTX opcodes (for example `warp_reduce_add`), use split sources:
+
+- Host executable source: `cuda/demo/warp_reduce_add_demo_executable.cu`
+- PTX override source: `cuda/demo/warp_reduce_add_demo_ptx.cu`
+
+Build host executable:
+
+```bash
+clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+Generate PTX override text:
+
+```bash
+clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+Run through shim:
+
+```bash
+export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
+./cuda/demo/warp_reduce_add_demo_executable
+```
+
+Why split this way: a normal host CUDA build path invokes `ptxas`, which rejects unknown custom opcodes. Using a separate device-only PTX override keeps the host binary toolchain-compatible while still validating custom opcode execution in ProtoGPU.
+
+---
+
 ## 4. Common issues
 
 - clang 18.x only supports CUDA Toolkit ≤ 12.3; CUDA 13.x+ headers are incompatible.
 - If headers cannot be found (e.g. `texture_fetch_functions.h`), verify your CUDA Toolkit path/version (e.g. `/usr/local/cuda`).
 - It’s recommended to use a consistent clang + CUDA version pair and avoid mixing with system nvcc/clang.
-- If gpu-sim reports missing assets or unsupported instructions, add/complete the corresponding JSON files.
+- If ProtoGPU reports missing assets or unsupported instructions, add/complete the corresponding JSON files.
 - Some clang 18 builds do not support `--cuda-ptx-version`; if you get an error, remove that flag.
 
 ---

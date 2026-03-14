@@ -5,11 +5,11 @@
 
 - 如何在 Ubuntu 24.04 下配置 clang 18.1.3 和 CUDA Toolkit 12.x 环境
 - 如何编译 demo.cu 生成可执行程序和 PTX 文件
-- 如何在 gpu-sim 上运行 PTX 6.4/sm_70 并验证仿真
+- 如何在 ProtoGPU 上运行 PTX 6.4/sm_70 并验证仿真
 - 常见问题与排查建议
 - 相关构建文档和官方参考资料链接
 
-适用于希望用 clang+CUDA 工具链配合 gpu-sim 进行 PTX 仿真的开发者。
+适用于希望用 clang+CUDA 工具链配合 ProtoGPU 进行 PTX 仿真的开发者。
 
 ## 1. 环境准备
 
@@ -161,7 +161,7 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 
 ---
 
-## 3. 在 gpu-sim 上运行 PTX 6.4/sm_70
+## 3. 在 ProtoGPU 上运行 PTX 6.4/sm_70
 
 假设已编译出 demo.ptx，且已准备好对应的资产文件：
 
@@ -210,13 +210,53 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 
 ---
 
+## 3.2 warp_reduce_add demo（可执行与 PTX 源分离）
+
+对于自定义 PTX 指令（例如 `warp_reduce_add`），建议使用“可执行源 + PTX 源分离”方式：
+
+- Host 可执行程序源码：`cuda/demo/warp_reduce_add_demo_executable.cu`
+- PTX override 源码：`cuda/demo/warp_reduce_add_demo_ptx.cu`
+
+编译 host 可执行程序：
+
+```bash
+clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+生成 PTX override 文本：
+
+```bash
+clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+通过 shim 运行：
+
+```bash
+export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
+./cuda/demo/warp_reduce_add_demo_executable
+```
+
+这样分离的原因：常规 host CUDA 编译路径会调用 `ptxas`，它无法接受未知自定义指令；把自定义指令放在独立的 device-only PTX override 中，可以同时保持 host 编译兼容性和 ProtoGPU 端到端验证能力。
+
+---
+
 
 ## 4. 常见问题
 
 - clang 18.x 仅支持 CUDA Toolkit ≤ 12.3，13.x 及以上头文件不兼容。
 - 如遇找不到头文件（如 `texture_fetch_functions.h`），请确认 CUDA Toolkit 路径和版本（如 /usr/local/cuda）。
 - 建议全程使用同一版本 clang 和 CUDA，避免混用系统自带 nvcc/clang。
-- 若 gpu-sim 报资产缺失或指令不支持，请补齐对应 JSON 文件。
+- 若 ProtoGPU 报资产缺失或指令不支持，请补齐对应 JSON 文件。
 - clang 18 某些版本不支持 `--cuda-ptx-version`，如遇报错请移除该参数。
 
 ---
