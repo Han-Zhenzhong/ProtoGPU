@@ -149,6 +149,96 @@ void test_unknown_uop_has_context_in_message() {
   EXPECT_CONTAINS(msg, "unknown uop op");
 }
 
+void test_warp_reduce_add_uop_parses_and_looks_up() {
+  using namespace gpusim;
+
+  const std::string json = R"JSON(
+  {
+    "insts": [
+      {
+        "opcode": "warp_reduce_add",
+        "type_mod": "f32",
+        "operand_kinds": ["reg", "reg"],
+        "uops": [
+          { "kind": "EXEC", "op": "WARP_REDUCE_ADD", "in": [1], "out": [0] }
+        ]
+      }
+    ]
+  }
+  )JSON";
+
+  DescriptorRegistry reg;
+  reg.load_json_text(json);
+
+  InstRecord inst;
+  inst.opcode = "warp_reduce_add";
+  inst.mods.type_mod = "f32";
+
+  Operand dst;
+  dst.kind = OperandKind::Reg;
+  dst.type = ValueType::F32;
+  dst.reg_id = 0;
+
+  Operand src;
+  src.kind = OperandKind::Reg;
+  src.type = ValueType::F32;
+  src.reg_id = 1;
+
+  inst.operands = {dst, src};
+
+  const auto desc = reg.lookup(inst);
+  EXPECT_TRUE(desc.has_value());
+  if (desc) {
+    EXPECT_TRUE(!desc->uops.empty());
+    EXPECT_TRUE(desc->uops[0].op == MicroOpOp::WarpReduceAdd);
+  }
+}
+
+void test_cvt_uop_parses_and_looks_up() {
+  using namespace gpusim;
+
+  const std::string json = R"JSON(
+  {
+    "insts": [
+      {
+        "opcode": "cvt",
+        "type_mod": "u32",
+        "operand_kinds": ["reg", "reg"],
+        "uops": [
+          { "kind": "EXEC", "op": "CVT", "in": [1], "out": [0] }
+        ]
+      }
+    ]
+  }
+  )JSON";
+
+  DescriptorRegistry reg;
+  reg.load_json_text(json);
+
+  InstRecord inst;
+  inst.opcode = "cvt";
+  inst.mods.type_mod = "u32";
+
+  Operand dst;
+  dst.kind = OperandKind::Reg;
+  dst.type = ValueType::F32;
+  dst.reg_id = 0;
+
+  Operand src;
+  src.kind = OperandKind::Reg;
+  src.type = ValueType::U32;
+  src.reg_id = 1;
+
+  inst.operands = {dst, src};
+
+  const auto desc = reg.lookup(inst);
+  EXPECT_TRUE(desc.has_value());
+  if (desc) {
+    EXPECT_TRUE(!desc->uops.empty());
+    EXPECT_TRUE(desc->uops[0].op == MicroOpOp::Cvt);
+  }
+}
+
 } // namespace
 
 int main() {
@@ -156,6 +246,8 @@ int main() {
   test_strict_rejects_unknown_keys();
   test_strict_rejects_unknown_root_key();
   test_unknown_uop_has_context_in_message();
+  test_warp_reduce_add_uop_parses_and_looks_up();
+  test_cvt_uop_parses_and_looks_up();
 
   if (g_failures) {
     std::cerr << "FAILURES: " << g_failures << "\n";

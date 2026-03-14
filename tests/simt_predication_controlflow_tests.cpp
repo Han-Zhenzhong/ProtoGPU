@@ -48,6 +48,7 @@ gpusim::DescriptorRegistry make_registry_for_tests() {
   // - bra  (imm)             -> CTRL BRA  in=[0]
   // - bra2 (imm,imm)         -> CTRL BRA  in=[0] and CTRL BRA in=[1] (conflict)
   // - mov  (reg,imm)         -> EXEC MOV  in=[1] out=[0]
+  // - warp_reduce_add (reg,reg) -> EXEC WARP_REDUCE_ADD in=[1] out=[0]
   // - ret  ()                -> CTRL RET  in=[]
   const std::string desc_json = R"JSON(
   {
@@ -83,6 +84,14 @@ gpusim::DescriptorRegistry make_registry_for_tests() {
         "operand_kinds": ["reg", "imm"],
         "uops": [
           { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+        ]
+      },
+      {
+        "opcode": "warp_reduce_add",
+        "type_mod": "f32",
+        "operand_kinds": ["reg", "reg"],
+        "uops": [
+          { "kind": "EXEC", "op": "WARP_REDUCE_ADD", "in": [1], "out": [0] }
         ]
       },
       {
@@ -129,6 +138,13 @@ gpusim::Operand special(std::string s) {
   o.kind = gpusim::OperandKind::Special;
   o.special = std::move(s);
   return o;
+}
+
+std::optional<std::uint64_t> find_counter(const gpusim::ObsControl& obs, const std::string& key) {
+  for (const auto& kv : obs.counters_snapshot()) {
+    if (kv.first == key) return kv.second;
+  }
+  return std::nullopt;
 }
 
 void test_pred_oob_is_simt_error() {
@@ -275,6 +291,59 @@ void test_pc_oob_is_fail_fast() {
   }
 }
 
+void test_warp_reduce_add_predicated_exec_mask_path() {
+  using namespace gpusim;
+
+  auto registry = make_registry_for_tests();
+  ObsControl obs(ObsConfig{ true, 1024 });
+  AddrSpaceManager mem;
+
+  SimConfig cfg;
+  cfg.warp_size = 2;
+
+  // 0: mov.u32 r0, 1065353216  // 1.0f bits
+  // 1: setp.u32 p0, %laneid, 1 // lane0 true, lane1 false (default lt)
+  // 2: @p0 warp_reduce_add.f32 r1, r0
+  // 3: ret
+  InstRecord mov;
+  mov.opcode = "mov";
+  mov.mods.type_mod = "u32";
+  mov.operands = { reg_u32(0), imm(1065353216) };
+
+  InstRecord setp_inst;
+  setp_inst.opcode = "setp";
+  setp_inst.mods.type_mod = "u32";
+  setp_inst.operands = { pred(0), special("laneid"), imm(1) };
+
+  InstRecord wra;
+  wra.opcode = "warp_reduce_add";
+  wra.mods.type_mod = "f32";
+  wra.pred = PredGuard{ 0, false };
+  wra.operands = { reg_u32(1), reg_u32(0) };
+
+  InstRecord ret;
+  ret.opcode = "ret";
+
+  auto kernel = make_kernel("k_warp_reduce_pred", /*reg_u32=*/2, { mov, setp_inst, wra, ret });
+
+  LaunchConfig launch;
+  launch.grid_dim = Dim3{ 1, 1, 1 };
+  launch.block_dim = Dim3{ 2, 1, 1 };
+  launch.warp_size = 2;
+
+  SimtExecutor sim(cfg, std::move(registry), obs, mem);
+  const auto out = sim.run(kernel, launch);
+
+  EXPECT_TRUE(out.completed);
+  EXPECT_TRUE(!out.diag.has_value());
+
+  const auto c = find_counter(obs, "uop.exec.warp_reduce_add.f32");
+  EXPECT_TRUE(c.has_value());
+  if (c) {
+    EXPECT_EQ(*c, static_cast<std::uint64_t>(1));
+  }
+}
+
 } // namespace
 
 int main() {
@@ -282,6 +351,7 @@ int main() {
   test_divergence_reconverges_and_completes();
   test_next_pc_conflict_is_fail_fast();
   test_pc_oob_is_fail_fast();
+  test_warp_reduce_add_predicated_exec_mask_path();
 
   if (g_failures) {
     std::cerr << "FAILURES: " << g_failures << "\n";

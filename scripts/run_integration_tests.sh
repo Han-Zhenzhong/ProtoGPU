@@ -70,6 +70,11 @@ if [[ -f "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" ]]; then
   bash "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" "$BUILD_DIR"
 fi
 
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_warp_reduce_add_demo_cu.sh" ]]; then
+  echo "[integration] running CUDA Runtime shim warp_reduce_add .cu demo (if supported)"
+  bash "$SCRIPT_DIR/run_cuda_shim_warp_reduce_add_demo_cu.sh" "$BUILD_DIR"
+fi
+
 PTX="assets/ptx/demo_kernel.ptx"
 PTX_DIVERGE="assets/ptx/demo_divergence.ptx"
 PTX_ISA="assets/ptx_isa/demo_ptx64.json"
