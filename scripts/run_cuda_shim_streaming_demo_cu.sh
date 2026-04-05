@@ -13,6 +13,7 @@ SKIP_RC="${GPUSIM_TEST_SKIP_RC:-0}"
 CUDA_PATH="${CUDA_PATH:-${CUDA_HOME:-/usr/local/cuda}}"
 CLANGXX="${CLANGXX:-clang++}"
 ARCH="${GPUSIM_CUDA_ARCH:-sm_70}"
+TOOLCHAIN_OK=1
 
 cd "$REPO_ROOT"
 
@@ -22,23 +23,20 @@ if [[ "$(uname -s)" != "Linux"* ]]; then
 fi
 
 if ! command -v "$CLANGXX" >/dev/null 2>&1; then
-	echo "[cudart-shim-streaming-cu] skip: $CLANGXX not found"
-	exit "$SKIP_RC"
+	TOOLCHAIN_OK=0
 fi
 
 if [[ ! -f "$CUDA_PATH/include/cuda_runtime.h" ]]; then
-	echo "[cudart-shim-streaming-cu] skip: CUDA headers not found under $CUDA_PATH/include"
-	echo "[cudart-shim-streaming-cu] hint: set CUDA_PATH=/path/to/cuda"
-	exit "$SKIP_RC"
+	TOOLCHAIN_OK=0
 fi
 
 if [[ ! -f "$CUDA_PATH/lib64/libcudart.so" && ! -f "$CUDA_PATH/lib64/libcudart.so.12" && ! -f "$CUDA_PATH/lib64/libcudart.so.11" ]]; then
-	echo "[cudart-shim-streaming-cu] skip: CUDA libcudart not found under $CUDA_PATH/lib64"
-	echo "[cudart-shim-streaming-cu] hint: set CUDA_PATH=/path/to/cuda"
-	exit "$SKIP_RC"
+	TOOLCHAIN_OK=0
 fi
 
 SRC="$REPO_ROOT/cuda/demo/streaming_demo.cu"
+PREBUILT_BIN="$REPO_ROOT/cuda/demo/streaming_demo"
+PREBUILT_PTX="$REPO_ROOT/cuda/demo/streaming_demo.ptx"
 if [[ ! -f "$SRC" ]]; then
 	echo "[cudart-shim-streaming-cu] skip: missing $SRC"
 	exit "$SKIP_RC"
@@ -78,56 +76,80 @@ mkdir -p "$OUT_DIR"
 
 BIN="$OUT_DIR/streaming_demo"
 PTX="$OUT_DIR/streaming_demo.ptx"
-PTX_OVERRIDE_VALUE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$PTX}"
+BIN_TO_RUN="$BIN"
+PTX_TO_USE="$PTX"
 STDOUT="$OUT_DIR/cudart_streaming_cu_stdout.txt"
 STDERR="$OUT_DIR/cudart_streaming_cu_stderr.txt"
 
-echo "[cudart-shim-streaming-cu] compiling host binary ($ARCH)"
-set +e
-"$CLANGXX" "$SRC" -o "$BIN" \
-	--cuda-path="$CUDA_PATH" \
-	--cuda-gpu-arch="$ARCH" \
-	-I"$CUDA_PATH/include" -L"$CUDA_PATH/lib64" -lcudart \
-	>"$OUT_DIR/cudart_streaming_cu_build_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_build_stderr.txt"
-RC=$?
-set -e
-if [[ $RC -ne 0 ]]; then
-	echo "[cudart-shim-streaming-cu] skip: failed to compile streaming_demo.cu (exit=$RC)" >&2
-	echo "--- stdout ($OUT_DIR/cudart_streaming_cu_build_stdout.txt) ---" >&2
-	tail -n 120 "$OUT_DIR/cudart_streaming_cu_build_stdout.txt" >&2 || true
-	echo "--- stderr ($OUT_DIR/cudart_streaming_cu_build_stderr.txt) ---" >&2
-	tail -n 200 "$OUT_DIR/cudart_streaming_cu_build_stderr.txt" >&2 || true
-	exit "$SKIP_RC"
+if [[ $TOOLCHAIN_OK -eq 1 ]]; then
+	echo "[cudart-shim-streaming-cu] CUDA toolkit detected; compiling host binary ($ARCH)"
+	set +e
+	"$CLANGXX" "$SRC" -o "$BIN" \
+		--cuda-path="$CUDA_PATH" \
+		--cuda-gpu-arch="$ARCH" \
+		-I"$CUDA_PATH/include" -L"$CUDA_PATH/lib64" -lcudart \
+		>"$OUT_DIR/cudart_streaming_cu_build_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_build_stderr.txt"
+	RC=$?
+	set -e
+	if [[ $RC -ne 0 ]]; then
+		echo "error: failed to compile streaming_demo.cu (exit=$RC)" >&2
+		echo "--- stdout ($OUT_DIR/cudart_streaming_cu_build_stdout.txt) ---" >&2
+		tail -n 120 "$OUT_DIR/cudart_streaming_cu_build_stdout.txt" >&2 || true
+		echo "--- stderr ($OUT_DIR/cudart_streaming_cu_build_stderr.txt) ---" >&2
+		tail -n 200 "$OUT_DIR/cudart_streaming_cu_build_stderr.txt" >&2 || true
+		exit $RC
+	fi
+
+	echo "[cudart-shim-streaming-cu] generating text PTX for override"
+	set +e
+	"$CLANGXX" "$SRC" -S -o "$PTX" \
+		--cuda-path="$CUDA_PATH" \
+		--cuda-gpu-arch="$ARCH" \
+		--cuda-device-only --cuda-feature=+ptx64 \
+		-I"$CUDA_PATH/include" \
+		>"$OUT_DIR/cudart_streaming_cu_ptx_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt"
+	RC=$?
+	set -e
+	if [[ $RC -ne 0 ]]; then
+		echo "error: failed to generate PTX from streaming_demo.cu (exit=$RC)" >&2
+		echo "--- stderr ($OUT_DIR/cudart_streaming_cu_ptx_stderr.txt) ---" >&2
+		tail -n 200 "$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt" >&2 || true
+		exit $RC
+	fi
+
+	if [[ ! -s "$PTX" ]]; then
+		echo "error: PTX output missing/empty: $PTX" >&2
+		exit 1
+	fi
+else
+	echo "[cudart-shim-streaming-cu] CUDA toolkit unavailable; using prebuilt demo artifacts"
+	BIN_TO_RUN="$PREBUILT_BIN"
+	PTX_TO_USE="$PREBUILT_PTX"
+	if [[ ! -f "$BIN_TO_RUN" ]]; then
+		echo "error: missing prebuilt executable: $BIN_TO_RUN" >&2
+		exit 2
+	fi
+	if [[ ! -x "$BIN_TO_RUN" ]]; then
+		chmod +x "$BIN_TO_RUN" || true
+	fi
+	if [[ ! -x "$BIN_TO_RUN" ]]; then
+		echo "error: prebuilt executable is not executable: $BIN_TO_RUN" >&2
+		exit 2
+	fi
+	if [[ ! -s "$PTX_TO_USE" ]]; then
+		echo "error: missing/empty prebuilt PTX: $PTX_TO_USE" >&2
+		exit 2
+	fi
 fi
 
-echo "[cudart-shim-streaming-cu] generating text PTX for override"
-set +e
-"$CLANGXX" "$SRC" -S -o "$PTX" \
-	--cuda-path="$CUDA_PATH" \
-	--cuda-gpu-arch="$ARCH" \
-	--cuda-device-only --cuda-feature=+ptx64 \
-	-I"$CUDA_PATH/include" \
-	>"$OUT_DIR/cudart_streaming_cu_ptx_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt"
-RC=$?
-set -e
-if [[ $RC -ne 0 ]]; then
-	echo "[cudart-shim-streaming-cu] skip: failed to generate PTX (exit=$RC)" >&2
-	echo "--- stderr ($OUT_DIR/cudart_streaming_cu_ptx_stderr.txt) ---" >&2
-	tail -n 200 "$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt" >&2 || true
-	exit "$SKIP_RC"
-fi
-
-if [[ ! -s "$PTX" ]]; then
-	echo "[cudart-shim-streaming-cu] skip: PTX output missing/empty: $PTX" >&2
-	exit "$SKIP_RC"
-fi
+PTX_OVERRIDE_VALUE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$PTX_TO_USE}"
 
 echo "[cudart-shim-streaming-cu] running under shim (LD_LIBRARY_PATH=$SHIM_DIR)"
 set +e
 LD_LIBRARY_PATH="$SHIM_DIR" \
 	GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PTX_OVERRIDE_VALUE" \
 	GPUSIM_CUDART_SHIM_LOG="${GPUSIM_CUDART_SHIM_LOG:-0}" \
-	"$BIN" >"$STDOUT" 2>"$STDERR"
+	"$BIN_TO_RUN" >"$STDOUT" 2>"$STDERR"
 RC=$?
 set -e
 
