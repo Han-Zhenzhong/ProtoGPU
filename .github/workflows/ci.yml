@@ -12,6 +12,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  hooks-check:
+    name: Hooks Check (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install hook dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Run pre-commit hook on PR diff
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          # Rebuild index from base so pre-commit sees PR changes as staged diff.
+          git read-tree "$BASE_SHA"
+
+          mapfile -t changed_files < <(git diff --name-only --diff-filter=ACM "$BASE_SHA" "$HEAD_SHA" -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp')
+
+          if [[ ${#changed_files[@]} -eq 0 ]]; then
+            echo "[hooks-check] No C/C++ changes in PR; pre-commit will no-op."
+          else
+            git add -- "${changed_files[@]}"
+          fi
+
+          bash scripts/git-hooks/pre-commit
+
+      - name: Run commit-msg hook on PR commits
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          git log --format=%s "$BASE_SHA..$HEAD_SHA" > /tmp/pr_commit_subjects.txt
+
+          while IFS= read -r subject; do
+            [[ -z "$subject" ]] && continue
+            printf '%s\n' "$subject" > /tmp/one_commit_msg.txt
+            bash scripts/git-hooks/commit-msg /tmp/one_commit_msg.txt
+          done < /tmp/pr_commit_subjects.txt
+
   unit-tests:
     name: Unit Tests (Linux)
     runs-on: ubuntu-latest
