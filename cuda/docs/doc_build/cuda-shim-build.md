@@ -65,14 +65,14 @@ This validates:
 
 ---
 
-## 3.0) Run streaming demo test (no CUDA toolkit required)
+## 3.0) Run streaming shim test (no CUDA toolkit required)
 
 This builds and runs a small C++ executable that links against the shim and exercises:
 - `cudaStreamCreate/Destroy/Synchronize`
 - `cudaMemcpyAsync` on two streams (MVP semantics: synchronous execution, FIFO ordering)
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-streaming-demo$"
+ctest --test-dir build -V -R "^gpu-sim-cudart-shim-streaming-tests$"
 ```
 
 ---

@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <vector>
 
-// A tiny "CUDA C" style host demo that exercises streams + async copies.
+// A small host-side shim test that exercises streams + async copies.
 // This intentionally avoids depending on CUDA headers/toolkit: it targets the shim ABI.
 
 extern "C" {

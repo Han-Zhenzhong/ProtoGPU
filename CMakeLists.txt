@@ -133,18 +133,18 @@ if (BUILD_TESTING)
   )
   add_test(NAME gpu-sim-cudart-shim-ptx-override-tests COMMAND gpu-sim-cudart-shim-ptx-override-tests)
 
-  # Streaming demo (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
-  add_executable(gpu-sim-cudart-shim-streaming-demo
-    cuda/demo/streaming_cudac_demo.cpp
+  # Streaming shim test (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
+  add_executable(gpu-sim-cudart-shim-streaming-tests
+    tests/cudart_shim_streaming_tests.cpp
   )
-  target_link_libraries(gpu-sim-cudart-shim-streaming-demo PRIVATE gpu-sim-cudart-shim)
+  target_link_libraries(gpu-sim-cudart-shim-streaming-tests PRIVATE gpu-sim-cudart-shim)
   add_test(
-    NAME gpu-sim-cudart-shim-streaming-demo
+    NAME gpu-sim-cudart-shim-streaming-tests
     COMMAND ${CMAKE_COMMAND} -E env
             LD_LIBRARY_PATH=$<TARGET_FILE_DIR:gpu-sim-cudart-shim>
-            $<TARGET_FILE:gpu-sim-cudart-shim-streaming-demo>
+            $<TARGET_FILE:gpu-sim-cudart-shim-streaming-tests>
   )
-  set_tests_properties(gpu-sim-cudart-shim-streaming-demo PROPERTIES
+  set_tests_properties(gpu-sim-cudart-shim-streaming-tests PROPERTIES
     PASS_REGULAR_EXPRESSION "OK"
   )
 
