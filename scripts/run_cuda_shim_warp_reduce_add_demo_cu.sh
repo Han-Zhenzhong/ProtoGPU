@@ -85,7 +85,7 @@ if [[ $need_build -eq 1 ]]; then
   if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
     cmake --build "$BUILD_DIR" --config "$CONFIG" --target gpu-sim-cudart-shim
   else
-    BUILD_TESTING=ON bash "$SCRIPT_DIR/build.sh" "$BUILD_DIR" "$CONFIG"
+    BUILD_TESTING=ON bash "$SCRIPT_DIR/build_all.sh" "$BUILD_DIR" "$CONFIG"
   fi
 fi
 

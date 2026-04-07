@@ -44,7 +44,7 @@ fi
 
 if [[ $need_build -eq 1 ]]; then
   echo "[cudart-shim-multi-ptx-demo] build artifacts missing; building first"
-  BUILD_TESTING=ON bash "$SCRIPT_DIR/build.sh" "$BUILD_DIR" "$CONFIG"
+  BUILD_TESTING=ON bash "$SCRIPT_DIR/build_all.sh" "$BUILD_DIR" "$CONFIG"
 fi
 
 SHIM_DIR=""

@@ -7,7 +7,7 @@
 - 建议从“仓库根目录”执行脚本（使用相对路径资源）。
 - 说明：脚本内部会自动切换到仓库根目录执行，因此也可以从任意工作目录调用。
 
-说明：目前 `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 `scripts/build.*` 进行 configure + build。
+说明：目前 `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 Bash 平台上的 `scripts/build_all.sh` 或 Windows 上的 `scripts/build.bat` 进行 configure + build。
 
 ## 构建（可选手动执行）
 
@@ -22,7 +22,7 @@ scripts\build.bat build Release
 Bash（Git Bash / WSL / Linux / macOS）
 
 ```bash
-bash scripts/build.sh build Release
+bash scripts/build_all.sh build Release
 ```
 
 常用环境变量

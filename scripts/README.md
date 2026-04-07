@@ -12,7 +12,7 @@ Script entry points.
 
 - Build and environment requirements are documented here:
   - [docs/doc_build/build.md](../docs/doc_build/build.md)
-- `run_unit_tests.*` / `run_integration_tests.*` will automatically call `scripts/build.*` to configure + build if the `build/` directory or target executables are missing.
+- `run_unit_tests.*` / `run_integration_tests.*` will automatically call `scripts/build_all.sh` on Bash-based platforms or `scripts/build.bat` on Windows to configure + build if the `build/` directory or target executables are missing.
 
 ## Test scripts
 

@@ -9,7 +9,7 @@ The repo-root `scripts/` directory provides quick entry points to run unit tests
 - It’s recommended to run the scripts from the **repo root** (they use relative paths to assets).
 - Note: the scripts will automatically `cd` to the repo root internally, so you can also invoke them from any working directory.
 
-Currently, `run_unit_tests.*` / `run_integration_tests.*` will auto-call `scripts/build.*` (configure + build) if the build directory or target executables are missing.
+Currently, `run_unit_tests.*` / `run_integration_tests.*` will auto-call `scripts/build_all.sh` on Bash-based platforms or `scripts/build.bat` on Windows (configure + build) if the build directory or target executables are missing.
 
 ## Build (optional manual step)
 
@@ -24,7 +24,7 @@ scripts\build.bat build Release
 Bash (Git Bash / WSL / Linux / macOS)
 
 ```bash
-bash scripts/build.sh build Release
+bash scripts/build_all.sh build Release
 ```
 
 Common environment variables
