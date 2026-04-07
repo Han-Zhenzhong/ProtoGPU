@@ -9,6 +9,7 @@
 - 构建方式与环境要求见构建文档：
 	- [docs/doc_build/build.zh-CN.md](../docs/doc_build/build.zh-CN.md)
 - `run_unit_tests.*` / `run_integration_tests.*` 在发现 build 目录或目标可执行文件不存在时，会自动先调用 Bash 平台上的 `scripts/build_all.sh` 或 Windows 上的 `scripts/build.bat` 进行 configure + build。
+- Bash 平台上如果要清理本地构建产物，可使用 `scripts/clean_all_builds.sh`。
 
 ## 测试脚本
 
@@ -51,6 +52,7 @@ scripts\run_unit_tests.bat build
 ```bash
 bash scripts/run_unit_tests.sh build
 bash scripts/run_integration_tests.sh build
+bash scripts/clean_all_builds.sh
 ```
 
 同样可用 `CONFIG=Debug|Release` 选择 multi-config 的配置：

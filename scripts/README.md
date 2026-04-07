@@ -13,6 +13,7 @@ Script entry points.
 - Build and environment requirements are documented here:
   - [docs/doc_build/build.md](../docs/doc_build/build.md)
 - `run_unit_tests.*` / `run_integration_tests.*` will automatically call `scripts/build_all.sh` on Bash-based platforms or `scripts/build.bat` on Windows to configure + build if the `build/` directory or target executables are missing.
+- To remove local build artifacts on Bash-based platforms, use `scripts/clean_all_builds.sh`.
 
 ## Test scripts
 
@@ -58,6 +59,7 @@ scripts\run_unit_tests.bat build
 ```bash
 bash scripts/run_unit_tests.sh build
 bash scripts/run_integration_tests.sh build
+bash scripts/clean_all_builds.sh
 ```
 
 You can also use `CONFIG=Debug|Release` for multi-config:

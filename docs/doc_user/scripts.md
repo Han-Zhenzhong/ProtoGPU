@@ -33,6 +33,12 @@ Common environment variables
 - `BUILD_TESTING=ON|OFF`: whether to build test targets (default: ON)
 - `GENERATOR`: force a specific CMake generator (e.g. `Ninja`); if not set, the scripts prefer Ninja automatically when available
 
+To clean local build artifacts on Bash-based platforms:
+
+```bash
+bash scripts/clean_all_builds.sh
+```
+
 ## Unit tests
 
 Purpose: run `gpu-sim-tests` (or run registered CTest cases via `ctest`).

@@ -31,6 +31,12 @@ bash scripts/build_all.sh build Release
 - `BUILD_TESTING=ON|OFF`：是否构建测试目标（默认 ON）
 - `GENERATOR`：强制指定 CMake generator（例如 `Ninja`），不设置则优先自动使用 Ninja（如果系统有）
 
+如果要在 Bash 平台上清理本地构建产物，可运行：
+
+```bash
+bash scripts/clean_all_builds.sh
+```
+
 ## 单元测试
 
 用途：运行 `gpu-sim-tests`（或通过 `ctest` 运行已注册的 CTest 用例）。
