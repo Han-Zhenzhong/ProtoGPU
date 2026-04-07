@@ -79,7 +79,7 @@ ctest --test-dir build -V -R "^gpu-sim-cudart-shim-streaming-tests$"
 
 ## 3.1) Run end-to-end demo integration (Linux/WSL)
 
-This runs the prebuilt demo host binary (`cuda/demo/demo`) against the shim via `LD_LIBRARY_PATH` and asserts it prints `OK`.
+This runs the shim demo path against `cuda/demo/demo.cu`. When clang + CUDA Toolkit are available, the script compiles the host binary and generates text PTX on the fly; otherwise it falls back to the prebuilt `cuda/demo/demo` and `cuda/demo/demo.ptx` artifacts. In both cases it runs the binary against the shim via `LD_LIBRARY_PATH` and asserts it prints `OK`.
 
 Via CTest:
 

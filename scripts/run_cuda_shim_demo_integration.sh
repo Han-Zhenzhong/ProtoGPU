@@ -4,10 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+source "$SCRIPT_DIR/cuda_shim_toolchain_helpers.sh"
+
 BUILD_DIR="${1:-build}"
 CONFIG="${CONFIG:-Release}"
 
 SKIP_RC="${GPUSIM_TEST_SKIP_RC:-0}"
+TOOLCHAIN_OK=0
 
 validate_ptx_override_value() {
   local value="$1"
@@ -36,25 +39,25 @@ if [[ "$(uname -s)" != "Linux"* ]]; then
   exit "$SKIP_RC"
 fi
 
-DEMO="$REPO_ROOT/cuda/demo/demo"
-if [[ ! -f "$DEMO" ]]; then
-  echo "[cudart-shim-demo] skip: missing $DEMO"
-  exit "$SKIP_RC"
+gpusim_cuda_toolchain_init
+if gpusim_cuda_toolchain_available; then
+  TOOLCHAIN_OK=1
 fi
-if [[ ! -x "$DEMO" ]]; then
-  echo "[cudart-shim-demo] skip: $DEMO is not executable (check git file mode)"
+
+SRC="$REPO_ROOT/cuda/demo/demo.cu"
+PREBUILT_BIN="$REPO_ROOT/cuda/demo/demo"
+PREBUILT_PTX="$REPO_ROOT/cuda/demo/demo.ptx"
+
+if [[ ! -f "$SRC" && ! -f "$PREBUILT_BIN" ]]; then
+  echo "[cudart-shim-demo] skip: missing both $SRC and $PREBUILT_BIN"
   exit "$SKIP_RC"
 fi
 
 # The shim's fatbin->PTX extraction is still MVP-level, so default to providing
 # an explicit text PTX module for this demo.
-DEFAULT_PTX_OVERRIDE="$REPO_ROOT/cuda/demo/demo.ptx"
-PTX_OVERRIDE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-$DEFAULT_PTX_OVERRIDE}"
-if [[ -n "${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}" ]]; then
+PTX_OVERRIDE="${GPUSIM_CUDART_SHIM_PTX_OVERRIDE:-}"
+if [[ -n "$PTX_OVERRIDE" ]]; then
   validate_ptx_override_value "$PTX_OVERRIDE" || exit $?
-elif [[ ! -f "$DEFAULT_PTX_OVERRIDE" ]]; then
-  echo "[cudart-shim-demo] skip: missing $DEFAULT_PTX_OVERRIDE" >&2
-  exit "$SKIP_RC"
 fi
 
 need_build=0
@@ -94,12 +97,48 @@ fi
 OUT_DIR="$BUILD_DIR/test_out"
 mkdir -p "$OUT_DIR"
 
+BIN="$OUT_DIR/demo"
+PTX="$OUT_DIR/demo.ptx"
+BIN_TO_RUN="$BIN"
+PTX_TO_USE="$PTX"
+
+if [[ $TOOLCHAIN_OK -eq 1 && -f "$SRC" ]]; then
+  echo "[cudart-shim-demo] CUDA toolkit detected; compiling demo.cu host binary ($ARCH)"
+  gpusim_cuda_compile_host_binary "cudart_demo" "$SRC" "$BIN" "$OUT_DIR" || exit $?
+
+  echo "[cudart-shim-demo] generating text PTX for override"
+  gpusim_cuda_generate_ptx "cudart_demo" "$SRC" "$PTX" "$OUT_DIR" || exit $?
+else
+  echo "[cudart-shim-demo] CUDA toolkit unavailable; using prebuilt demo artifacts"
+  BIN_TO_RUN="$PREBUILT_BIN"
+  PTX_TO_USE="$PREBUILT_PTX"
+  if [[ ! -f "$BIN_TO_RUN" ]]; then
+    echo "[cudart-shim-demo] skip: missing prebuilt executable: $BIN_TO_RUN" >&2
+    exit "$SKIP_RC"
+  fi
+  if [[ ! -x "$BIN_TO_RUN" ]]; then
+    chmod +x "$BIN_TO_RUN" || true
+  fi
+  if [[ ! -x "$BIN_TO_RUN" ]]; then
+    echo "[cudart-shim-demo] skip: prebuilt executable is not executable: $BIN_TO_RUN" >&2
+    exit "$SKIP_RC"
+  fi
+  if [[ ! -s "$PTX_TO_USE" ]]; then
+    echo "[cudart-shim-demo] skip: missing/empty prebuilt PTX: $PTX_TO_USE" >&2
+    exit "$SKIP_RC"
+  fi
+fi
+
+if [[ -z "$PTX_OVERRIDE" ]]; then
+  PTX_OVERRIDE="$PTX_TO_USE"
+fi
+
 echo "[cudart-shim-demo] running demo with LD_LIBRARY_PATH=$SHIM_DIR"
 set +e
 LD_LIBRARY_PATH="$SHIM_DIR" \
   GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PTX_OVERRIDE" \
   GPUSIM_CUDART_SHIM_LOG="${GPUSIM_CUDART_SHIM_LOG:-0}" \
-  "$DEMO" >"$OUT_DIR/cudart_demo_stdout.txt" 2>"$OUT_DIR/cudart_demo_stderr.txt"
+  "$BIN_TO_RUN" >"$OUT_DIR/cudart_demo_stdout.txt" 2>"$OUT_DIR/cudart_demo_stderr.txt"
 RC=$?
 set -e
 
@@ -121,7 +160,7 @@ fi
 
 # Optional: verify the loader resolves libcudart from our build dir.
 if command -v ldd >/dev/null 2>&1; then
-  if ! LD_LIBRARY_PATH="$SHIM_DIR" ldd "$DEMO" | grep -E "libcudart\\.so\\.12" | grep -Fq "$SHIM_DIR"; then
+  if ! LD_LIBRARY_PATH="$SHIM_DIR" ldd "$BIN_TO_RUN" | grep -E "libcudart\.so\.12" | grep -Fq "$SHIM_DIR"; then
     echo "warning: ldd did not show libcudart.so.12 resolved from $SHIM_DIR (may still be OK with DT_RUNPATH/loader behavior)" >&2
   fi
 fi

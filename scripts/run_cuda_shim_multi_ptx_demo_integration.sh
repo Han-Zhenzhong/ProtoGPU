@@ -4,10 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+source "$SCRIPT_DIR/cuda_shim_toolchain_helpers.sh"
+
 BUILD_DIR="${1:-build}"
 CONFIG="${CONFIG:-Release}"
 
 SKIP_RC="${GPUSIM_TEST_SKIP_RC:-0}"
+TOOLCHAIN_OK=0
 
 cd "$REPO_ROOT"
 
@@ -16,19 +19,19 @@ if [[ "$(uname -s)" != "Linux"* ]]; then
   exit "$SKIP_RC"
 fi
 
-DEMO="$REPO_ROOT/cuda/demo/demo"
-REAL_PTX="$REPO_ROOT/cuda/demo/demo.ptx"
+gpusim_cuda_toolchain_init
+if gpusim_cuda_toolchain_available; then
+  TOOLCHAIN_OK=1
+fi
 
-if [[ ! -f "$DEMO" ]]; then
-  echo "[cudart-shim-multi-ptx-demo] skip: missing $DEMO"
-  exit "$SKIP_RC"
-fi
-if [[ ! -x "$DEMO" ]]; then
-  echo "[cudart-shim-multi-ptx-demo] skip: $DEMO is not executable (check git file mode)"
-  exit "$SKIP_RC"
-fi
-if [[ ! -f "$REAL_PTX" ]]; then
-  echo "[cudart-shim-multi-ptx-demo] skip: missing $REAL_PTX"
+SRC="$REPO_ROOT/cuda/demo/demo.cu"
+PREBUILT_BIN="$REPO_ROOT/cuda/demo/demo"
+PREBUILT_PTX="$REPO_ROOT/cuda/demo/demo.ptx"
+DEMO="$PREBUILT_BIN"
+REAL_PTX="$PREBUILT_PTX"
+
+if [[ ! -f "$SRC" && ! -f "$PREBUILT_BIN" ]]; then
+  echo "[cudart-shim-multi-ptx-demo] skip: missing both $SRC and $PREBUILT_BIN"
   exit "$SKIP_RC"
 fi
 
@@ -62,6 +65,37 @@ fi
 
 OUT_DIR="$BUILD_DIR/test_out"
 mkdir -p "$OUT_DIR"
+
+BIN="$OUT_DIR/demo_multi_ptx"
+PTX="$OUT_DIR/demo_multi_ptx.ptx"
+
+if [[ $TOOLCHAIN_OK -eq 1 && -f "$SRC" ]]; then
+  echo "[cudart-shim-multi-ptx-demo] CUDA toolkit detected; compiling demo.cu host binary ($ARCH)"
+  gpusim_cuda_compile_host_binary "cudart_multi_ptx_demo" "$SRC" "$BIN" "$OUT_DIR" || exit $?
+
+  echo "[cudart-shim-multi-ptx-demo] generating text PTX for override"
+  gpusim_cuda_generate_ptx "cudart_multi_ptx_demo" "$SRC" "$PTX" "$OUT_DIR" || exit $?
+
+  DEMO="$BIN"
+  REAL_PTX="$PTX"
+else
+  echo "[cudart-shim-multi-ptx-demo] CUDA toolkit unavailable; using prebuilt demo artifacts"
+  if [[ ! -f "$DEMO" ]]; then
+    echo "[cudart-shim-multi-ptx-demo] skip: missing prebuilt executable: $DEMO"
+    exit "$SKIP_RC"
+  fi
+  if [[ ! -x "$DEMO" ]]; then
+    chmod +x "$DEMO" || true
+  fi
+  if [[ ! -x "$DEMO" ]]; then
+    echo "[cudart-shim-multi-ptx-demo] skip: prebuilt executable is not executable: $DEMO"
+    exit "$SKIP_RC"
+  fi
+  if [[ ! -s "$REAL_PTX" ]]; then
+    echo "[cudart-shim-multi-ptx-demo] skip: missing/empty prebuilt PTX: $REAL_PTX"
+    exit "$SKIP_RC"
+  fi
+fi
 
 DUMMY_PTX="$OUT_DIR/multi_ptx_dummy.ptx"
 cat >"$DUMMY_PTX" <<'EOF'

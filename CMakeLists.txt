@@ -148,7 +148,8 @@ if (BUILD_TESTING)
     PASS_REGULAR_EXPRESSION "OK"
   )
 
-  # End-to-end shim integration: run the prebuilt ELF demo binary against the shim.
+  # End-to-end shim integration: compile demo.cu when the CUDA toolchain is available,
+  # otherwise fall back to the prebuilt demo binary/PTX artifacts.
   # This is Linux/WSL only.
   if (UNIX AND NOT APPLE)
     add_test(

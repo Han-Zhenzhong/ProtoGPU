@@ -4,16 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+source "$SCRIPT_DIR/cuda_shim_toolchain_helpers.sh"
+
 BUILD_DIR="${1:-build}"
 CONFIG="${CONFIG:-Release}"
 
 # Allow callers/CTest to treat missing toolchain as a skip.
 SKIP_RC="${GPUSIM_TEST_SKIP_RC:-0}"
-
-CUDA_PATH="${CUDA_PATH:-${CUDA_HOME:-/usr/local/cuda}}"
-CLANGXX="${CLANGXX:-clang++}"
-ARCH="${GPUSIM_CUDA_ARCH:-sm_70}"
-TOOLCHAIN_OK=1
+TOOLCHAIN_OK=0
 
 cd "$REPO_ROOT"
 
@@ -22,16 +20,9 @@ if [[ "$(uname -s)" != "Linux"* ]]; then
 	exit "$SKIP_RC"
 fi
 
-if ! command -v "$CLANGXX" >/dev/null 2>&1; then
-	TOOLCHAIN_OK=0
-fi
-
-if [[ ! -f "$CUDA_PATH/include/cuda_runtime.h" ]]; then
-	TOOLCHAIN_OK=0
-fi
-
-if [[ ! -f "$CUDA_PATH/lib64/libcudart.so" && ! -f "$CUDA_PATH/lib64/libcudart.so.12" && ! -f "$CUDA_PATH/lib64/libcudart.so.11" ]]; then
-	TOOLCHAIN_OK=0
+gpusim_cuda_toolchain_init
+if gpusim_cuda_toolchain_available; then
+	TOOLCHAIN_OK=1
 fi
 
 SRC="$REPO_ROOT/cuda/demo/streaming_demo.cu"
@@ -83,44 +74,10 @@ STDERR="$OUT_DIR/cudart_streaming_cu_stderr.txt"
 
 if [[ $TOOLCHAIN_OK -eq 1 ]]; then
 	echo "[cudart-shim-streaming-cu] CUDA toolkit detected; compiling host binary ($ARCH)"
-	set +e
-	"$CLANGXX" "$SRC" -o "$BIN" \
-		--cuda-path="$CUDA_PATH" \
-		--cuda-gpu-arch="$ARCH" \
-		-I"$CUDA_PATH/include" -L"$CUDA_PATH/lib64" -lcudart \
-		>"$OUT_DIR/cudart_streaming_cu_build_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_build_stderr.txt"
-	RC=$?
-	set -e
-	if [[ $RC -ne 0 ]]; then
-		echo "error: failed to compile streaming_demo.cu (exit=$RC)" >&2
-		echo "--- stdout ($OUT_DIR/cudart_streaming_cu_build_stdout.txt) ---" >&2
-		tail -n 120 "$OUT_DIR/cudart_streaming_cu_build_stdout.txt" >&2 || true
-		echo "--- stderr ($OUT_DIR/cudart_streaming_cu_build_stderr.txt) ---" >&2
-		tail -n 200 "$OUT_DIR/cudart_streaming_cu_build_stderr.txt" >&2 || true
-		exit $RC
-	fi
+	gpusim_cuda_compile_host_binary "cudart_streaming_cu" "$SRC" "$BIN" "$OUT_DIR" || exit $?
 
 	echo "[cudart-shim-streaming-cu] generating text PTX for override"
-	set +e
-	"$CLANGXX" "$SRC" -S -o "$PTX" \
-		--cuda-path="$CUDA_PATH" \
-		--cuda-gpu-arch="$ARCH" \
-		--cuda-device-only --cuda-feature=+ptx64 \
-		-I"$CUDA_PATH/include" \
-		>"$OUT_DIR/cudart_streaming_cu_ptx_stdout.txt" 2>"$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt"
-	RC=$?
-	set -e
-	if [[ $RC -ne 0 ]]; then
-		echo "error: failed to generate PTX from streaming_demo.cu (exit=$RC)" >&2
-		echo "--- stderr ($OUT_DIR/cudart_streaming_cu_ptx_stderr.txt) ---" >&2
-		tail -n 200 "$OUT_DIR/cudart_streaming_cu_ptx_stderr.txt" >&2 || true
-		exit $RC
-	fi
-
-	if [[ ! -s "$PTX" ]]; then
-		echo "error: PTX output missing/empty: $PTX" >&2
-		exit 1
-	fi
+	gpusim_cuda_generate_ptx "cudart_streaming_cu" "$SRC" "$PTX" "$OUT_DIR" || exit $?
 else
 	echo "[cudart-shim-streaming-cu] CUDA toolkit unavailable; using prebuilt demo artifacts"
 	BIN_TO_RUN="$PREBUILT_BIN"

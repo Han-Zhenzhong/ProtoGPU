@@ -29,6 +29,8 @@ On Linux/WSL, integration tests will also try to run an end-to-end CUDA Runtime 
 
 If clang + CUDA Toolkit are installed (i.e. `CUDA_PATH/include/cuda_runtime.h` is found), integration tests will also attempt to:
 
+- Build and run `cuda/demo/demo.cu`, and generate PTX override from the same source for the base shim demo path
+- Script entry: `scripts/run_cuda_shim_demo_integration.sh`
 - Build and run `cuda/demo/streaming_demo.cu` (via the shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`, which may be a single PTX path or a `:`-delimited PTX path list on Linux/WSL)
 - Script entry: `scripts/run_cuda_shim_streaming_demo_cu.sh`
 - Build and run `cuda/demo/warp_reduce_add_demo_executable.cu`, and generate PTX override from `cuda/demo/warp_reduce_add_demo_ptx.cu` (inline PTX `warp_reduce_add` end-to-end path via shim + PTX override)
