@@ -60,7 +60,7 @@ Args:
 
 Examples:
 	source scripts/enable_all_debuggabilities.sh build
-	bash scripts/run_cuda_shim_demo_integration.sh build
+	bash scripts/run_cuda_shim_e2e_demo_integration.sh build
 
 	eval "$(bash scripts/enable_all_debuggabilities.sh build)"
 	./cuda/demo/demo

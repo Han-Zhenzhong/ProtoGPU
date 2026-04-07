@@ -90,7 +90,7 @@ ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
 Via repo script:
 
 ```bash
-bash scripts/run_cuda_shim_demo_integration.sh build
+bash scripts/run_cuda_shim_e2e_demo_integration.sh build
 ```
 
 ---

@@ -55,24 +55,24 @@ OUT_DIR="$BUILD_DIR/test_out"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
-if [[ -f "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" ]]; then
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_e2e_demo_integration.sh" ]]; then
   echo "[integration] running CUDA Runtime shim demo integration (if supported)"
-  bash "$SCRIPT_DIR/run_cuda_shim_demo_integration.sh" "$BUILD_DIR"
+  bash "$SCRIPT_DIR/run_cuda_shim_e2e_demo_integration.sh" "$BUILD_DIR"
 fi
 
-if [[ -f "$SCRIPT_DIR/run_cuda_shim_multi_ptx_demo_integration.sh" ]]; then
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_e2e_multi_ptx_demo_integration.sh" ]]; then
   echo "[integration] running CUDA Runtime shim multi-PTX demo integration (if supported)"
-  bash "$SCRIPT_DIR/run_cuda_shim_multi_ptx_demo_integration.sh" "$BUILD_DIR"
+  bash "$SCRIPT_DIR/run_cuda_shim_e2e_multi_ptx_demo_integration.sh" "$BUILD_DIR"
 fi
 
-if [[ -f "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" ]]; then
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_e2e_streaming_demo_cu.sh" ]]; then
   echo "[integration] running CUDA Runtime shim streaming .cu demo (if supported)"
-  bash "$SCRIPT_DIR/run_cuda_shim_streaming_demo_cu.sh" "$BUILD_DIR"
+  bash "$SCRIPT_DIR/run_cuda_shim_e2e_streaming_demo_cu.sh" "$BUILD_DIR"
 fi
 
-if [[ -f "$SCRIPT_DIR/run_cuda_shim_warp_reduce_add_demo_cu.sh" ]]; then
+if [[ -f "$SCRIPT_DIR/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh" ]]; then
   echo "[integration] running CUDA Runtime shim warp_reduce_add .cu demo (if supported)"
-  bash "$SCRIPT_DIR/run_cuda_shim_warp_reduce_add_demo_cu.sh" "$BUILD_DIR"
+  bash "$SCRIPT_DIR/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh" "$BUILD_DIR"
 fi
 
 PTX="assets/ptx/demo_kernel.ptx"

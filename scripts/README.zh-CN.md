@@ -19,16 +19,16 @@
 - 集成测试：运行 `gpu-sim-cli` 的 demo 路径并校验关键输出/产物
 
 在 Linux/WSL 上，集成测试还会尝试跑一个 CUDA Runtime shim 的端到端 demo 回归（如果 `cuda/demo/demo` 可执行且 shim 已构建）：
-- `scripts/run_cuda_shim_demo_integration.sh`
-- `scripts/run_cuda_shim_multi_ptx_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh`
 
 如果本机安装了 clang + CUDA Toolkit（能找到 `CUDA_PATH/include/cuda_runtime.h`），集成测试也会尝试：
 - 编译并运行 `cuda/demo/demo.cu`，并从同一源码生成 PTX override，用于基础 shim demo 路径
-- 脚本入口：`scripts/run_cuda_shim_demo_integration.sh`
+- 脚本入口：`scripts/run_cuda_shim_e2e_demo_integration.sh`
 - 编译并运行 `cuda/demo/streaming_demo.cu`（通过 shim + `GPUSIM_CUDART_SHIM_PTX_OVERRIDE`；在 Linux/WSL 上该变量可以是单个 PTX 路径或用 `:` 分隔的 PTX 路径列表）
-- 脚本入口：`scripts/run_cuda_shim_streaming_demo_cu.sh`
+- 脚本入口：`scripts/run_cuda_shim_e2e_streaming_demo_cu.sh`
 - 编译并运行 `cuda/demo/warp_reduce_add_demo_executable.cu`，并从 `cuda/demo/warp_reduce_add_demo_ptx.cu` 生成 PTX override（通过 shim 验证 inline PTX `warp_reduce_add` 端到端路径）
-- 脚本入口：`scripts/run_cuda_shim_warp_reduce_add_demo_cu.sh`
+- 脚本入口：`scripts/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh`
 
 同时，测试脚本会包含一个 tiny GPT-2 bring-up 的最小端到端回归（CTests）：
 - `gpu-sim-tiny-gpt2-mincov-tests`

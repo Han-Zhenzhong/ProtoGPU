@@ -18,7 +18,7 @@ Implement minimum viable `cvt` support needed by the split-source `warp_reduce_a
 2. Instruction descriptor entry expanding to EXEC `CVT` uop.
 3. `ExecCore` `MicroOpOp::Cvt` implementation for `u32 -> f32` bit-correct writeback.
 4. Tests for happy-path conversion and unsupported-type diagnostics.
-5. End-to-end validation via `scripts/run_cuda_shim_warp_reduce_add_demo_cu.sh`.
+5. End-to-end validation via `scripts/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh`.
 
 ### Acceptance Criteria
 1. Split-source demo no longer fails with `DESC_NOT_FOUND` for `cvt`.

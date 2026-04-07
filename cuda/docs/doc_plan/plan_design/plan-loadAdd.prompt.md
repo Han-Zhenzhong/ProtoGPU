@@ -19,7 +19,7 @@ Add a custom PTX opcode load_add.global.u32 with semantics dst = dst + mem[addr]
 14. Phase 4: clang demo + integration automation
 15. Add new CUDA demo source in cuda/demo (for example load_add_demo.cu) using inline asm that emits load_add.global.u32 so generated PTX includes the custom opcode expected by simulator path.
 16. Add matching PTX artifact strategy: either checked-in PTX file under cuda/demo or generated PTX during script execution (preferred for reproducibility parity with existing streaming_demo.cu script).
-17. Add Linux integration script in scripts (pattern from run_cuda_shim_streaming_demo_cu.sh) to: compile demo .cu with clang, emit text PTX, run host binary with shim via LD_LIBRARY_PATH + GPUSIM_CUDART_SHIM_PTX_OVERRIDE, assert stdout contains OK, and provide skip behavior for missing toolchain.
+17. Add Linux integration script in scripts (pattern from run_cuda_shim_e2e_streaming_demo_cu.sh) to: compile demo .cu with clang, emit text PTX, run host binary with shim via LD_LIBRARY_PATH + GPUSIM_CUDART_SHIM_PTX_OVERRIDE, assert stdout contains OK, and provide skip behavior for missing toolchain.
 18. Register a new CTest target in CMakeLists.txt under UNIX-only integration section, with PASS_REGULAR_EXPRESSION=OK and SKIP_RETURN_CODE aligned with existing shim integration tests.
 19. Phase 5: Documentation and acceptance checks
 20. Update demo docs in cuda/demo/README.md with build/run commands and expected PTX snippet showing load_add.global.u32.

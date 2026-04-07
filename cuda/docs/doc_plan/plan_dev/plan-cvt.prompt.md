@@ -18,7 +18,7 @@ Implement `cvt` in a narrow, testable slice driven by clang-generated PTX used b
 - Descriptor lookup test for `CVT`.
 - Builtins/exec tests for successful `u32->f32` and unsupported type error.
 6. Validate end-to-end:
-- Run `scripts/run_cuda_shim_warp_reduce_add_demo_cu.sh`.
+- Run `scripts/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh`.
 - Fix next missing form if surfaced, without broadening scope unnecessarily.
 
 ### Done Criteria

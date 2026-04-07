@@ -329,8 +329,8 @@ No new dispatch structure is required.
 ### 7.1 Affected scripts
 
 - `scripts/setup_cudart_shim_running_env.sh`
-- `scripts/run_cuda_shim_demo_integration.sh`
-- `scripts/run_cuda_shim_streaming_demo_cu.sh`
+- `scripts/run_cuda_shim_e2e_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_streaming_demo_cu.sh`
 
 ### 7.2 `setup_cudart_shim_running_env.sh`
 
@@ -440,8 +440,8 @@ v1 does not require new Runtime or CLI tests for multi-PTX APIs because Runtime 
 
 - `cuda/src/cudart_shim/fatbin_registry.cpp`
 - `scripts/setup_cudart_shim_running_env.sh`
-- `scripts/run_cuda_shim_demo_integration.sh`
-- `scripts/run_cuda_shim_streaming_demo_cu.sh`
+- `scripts/run_cuda_shim_e2e_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_streaming_demo_cu.sh`
 - `cuda/docs/doc_user/cuda-shim.md`
 - `cuda/demo/README.md`
 - `cuda/demo/README.zh-CN.md`

@@ -161,7 +161,7 @@ ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
 Via repo script (also invoked by `scripts/run_integration_tests.sh`):
 
 ```bash
-bash scripts/run_cuda_shim_demo_integration.sh build
+bash scripts/run_cuda_shim_e2e_demo_integration.sh build
 ```
 
 There is also an end-to-end multi-PTX integration test that verifies ordered PTX lookup across multiple override files and a malformed-list failure case.
@@ -175,5 +175,5 @@ ctest --test-dir build -V -R "^gpu-sim-cudart-shim-multi-ptx-demo-integration$"
 Via repo script:
 
 ```bash
-bash scripts/run_cuda_shim_multi_ptx_demo_integration.sh build
+bash scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh build
 ```

@@ -22,8 +22,8 @@ Design an additive extension to the existing GPUSIM_CUDART_SHIM_PTX_OVERRIDE flo
 - /home/hanzz/ProtoGPU/cuda/src/cudart_shim/exports.cpp — current cudaLaunchKernel already scans mod->ptx_texts and binds the requested entry from the first matching PTX text.
 - /home/hanzz/ProtoGPU/cuda/src/cudart_shim/assets_provider.cpp — reference pattern for fail-fast environment-driven asset loading and helpful consistency target for override semantics.
 - /home/hanzz/ProtoGPU/scripts/setup_cudart_shim_running_env.sh — current helper only accepts one override path argument; likely needs argument/usage redesign.
-- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_demo_integration.sh — current integration runner assumes one PTX override path and is the natural regression/feature verification entry point.
-- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_streaming_demo_cu.sh — another script entry point that references the override variable and should stay behaviorally aligned.
+- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_e2e_demo_integration.sh — current integration runner assumes one PTX override path and is the natural regression/feature verification entry point.
+- /home/hanzz/ProtoGPU/scripts/run_cuda_shim_e2e_streaming_demo_cu.sh — another script entry point that references the override variable and should stay behaviorally aligned.
 - /home/hanzz/ProtoGPU/cuda/docs/doc_user/cuda-shim.md — main user doc for the shim environment variables; must define the new multi-file contract.
 - /home/hanzz/ProtoGPU/cuda/demo/README.md — demo guidance currently recommends one explicit PTX text override.
 - /home/hanzz/ProtoGPU/cuda/demo/README.zh-CN.md — localized demo guidance that mirrors the one-file behavior.

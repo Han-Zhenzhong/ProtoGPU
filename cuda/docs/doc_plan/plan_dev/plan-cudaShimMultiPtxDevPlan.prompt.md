@@ -152,7 +152,7 @@ Non-goals (v1):
 3. Decide on the minimum acceptable script change for v1:
    - at minimum, docs explain manual multi-path env usage
    - optionally, the script may accept multiple PTX arguments and join them with the platform delimiter
-4. Review `scripts/run_cuda_shim_demo_integration.sh` and `scripts/run_cuda_shim_streaming_demo_cu.sh` so they accept a valid multi-path override env var without rejecting it.
+4. Review `scripts/run_cuda_shim_e2e_demo_integration.sh` and `scripts/run_cuda_shim_e2e_streaming_demo_cu.sh` so they accept a valid multi-path override env var without rejecting it.
 
 ### Validation gate
 - Existing single-file script flows still work unchanged.

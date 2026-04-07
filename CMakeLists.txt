@@ -158,7 +158,7 @@ if (BUILD_TESTING)
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
               CONFIG=$<CONFIG>
-              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_demo_integration.sh
+                  bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_demo_integration.sh
                    ${CMAKE_BINARY_DIR}
     )
     set_tests_properties(gpu-sim-cudart-shim-demo-integration PROPERTIES
@@ -172,7 +172,7 @@ if (BUILD_TESTING)
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
               CONFIG=$<CONFIG>
-              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_multi_ptx_demo_integration.sh
+                  bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh
                    ${CMAKE_BINARY_DIR}
     )
     set_tests_properties(gpu-sim-cudart-shim-multi-ptx-demo-integration PROPERTIES
@@ -186,7 +186,7 @@ if (BUILD_TESTING)
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
               CONFIG=$<CONFIG>
-              bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_warp_reduce_add_demo_cu.sh
+                  bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh
                    ${CMAKE_BINARY_DIR}
     )
     set_tests_properties(gpu-sim-cudart-shim-warp-reduce-add-demo-integration PROPERTIES
