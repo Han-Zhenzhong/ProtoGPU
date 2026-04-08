@@ -1,16 +1,16 @@
-# demo.cu build and environment setup (Ubuntu 24.04)
+# CUDA demo build and environment setup (Ubuntu 24.04)
 
 > Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
-This directory provides a minimal CUDA C example (`demo.cu`) and explains:
+This directory provides several CUDA demo programs, including `demo.cu`, `streaming_demo.cu`, and the split `warp_reduce_add` demo sources, and explains:
 
 - How to set up clang 18.1.3 and CUDA Toolkit 12.x on Ubuntu 24.04
-- How to compile `demo.cu` into an executable and a PTX file
+- How to compile the provided CUDA demo sources into executables and PTX files
 - How to run PTX 6.4 / sm_70 on ProtoGPU and validate the simulation
 - Common issues and troubleshooting tips
 - Related build docs and official reference links
 
-Intended for developers who want to use a clang+CUDA toolchain with ProtoGPU for PTX simulation.
+Intended for developers who want to use a clang+CUDA toolchain with ProtoGPU for PTX simulation across the demo programs in this directory.
 
 ## 1. Environment preparation
 
@@ -53,9 +53,11 @@ ls /usr/local/cuda/include/cuda_runtime.h
 ls /usr/local/cuda/lib64/libcudart.so
 ```
 
-## 2. Build demo.cu
+## 2. Build the CUDA demo .cu sources
 
-### 2.1 Build the executable
+### 2.1 Build demo.cu
+
+#### 2.1.1 Build the executable
 
 ```bash
 clang++ demo.cu -o demo \
@@ -69,7 +71,7 @@ clang++ demo.cu -o demo \
 - `--cuda-gpu-arch` sets the target GPU architecture (e.g. `sm_70`)
 - `-lcudart` links the CUDA runtime
 
-### 2.2 Generate a PTX file
+#### 2.1.2 Generate a PTX file
 
 ```bash
 clang++ demo.cu -o demo.ptx \
@@ -98,7 +100,7 @@ You should typically see:
 
 ---
 
-## 2.3 Build streaming_demo.cu (streams + memcpyAsync + kernel)
+### 2.2 Build streaming_demo.cu (streams + memcpyAsync + kernel)
 
 This repo also provides a more “streaming-style” CUDA C demo:
 
@@ -106,7 +108,7 @@ This repo also provides a more “streaming-style” CUDA C demo:
 
 It creates two streams, and on each stream performs H2D → kernel → D2H, then validates results and prints `OK`.
 
-### 2.3.1 Build the executable
+#### 2.2.1 Build the executable
 
 ```bash
 clang++ streaming_demo.cu -o streaming_demo \
@@ -116,7 +118,7 @@ clang++ streaming_demo.cu -o streaming_demo \
   -I/usr/local/cuda/include
 ```
 
-### 2.3.2 Generate a PTX file (for shim PTX override)
+#### 2.2.2 Generate a PTX file (for shim PTX override)
 
 ```bash
 clang++ streaming_demo.cu -S -o streaming_demo.ptx \
@@ -133,7 +135,7 @@ Notes:
 - On Linux/WSL, `GPUSIM_CUDART_SHIM_PTX_OVERRIDE` may be a single PTX path or a `:`-delimited PTX path list. The shim searches listed PTX files in order, and the first PTX containing the requested `.entry` wins.
 - `-S` forces emission of **text PTX assembly**; otherwise, some clang versions/flag combinations may treat the output as an object file or another intermediate, leading to a `*.ptx` that isn’t readable PTX text.
 
-### 2.3.3 Run via the CUDA Runtime shim (Linux/WSL)
+#### 2.2.3 Run via the CUDA Runtime shim (Linux/WSL)
 
 From the repo root, build the shim (producing `build/libcudart.so.12`), put it on the loader’s search path, and set the PTX override:
 
@@ -155,6 +157,46 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 ```
 
 If the override env var is explicitly set and any listed PTX file is missing, empty, or not valid PTX text, the shim fails fast and does not fall back to fatbin extraction.
+
+---
+
+### 2.3 Build warp_reduce_add demo sources (split executable/PTX sources)
+
+For custom PTX opcodes (for example `warp_reduce_add`), use split sources:
+
+- Host executable source: `cuda/demo/warp_reduce_add_demo_executable.cu`
+- PTX override source: `cuda/demo/warp_reduce_add_demo_ptx.cu`
+
+Build host executable:
+
+```bash
+clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+Generate PTX override text:
+
+```bash
+clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+Run through shim:
+
+```bash
+export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
+./cuda/demo/warp_reduce_add_demo_executable
+```
+
+Why split this way: a normal host CUDA build path invokes `ptxas`, which rejects unknown custom opcodes. Using a separate device-only PTX override keeps the host binary toolchain-compatible while still validating custom opcode execution in ProtoGPU.
 
 ---
 
@@ -204,46 +246,6 @@ Notes:
 - In this workload, A/B are initialized to zeros, so C is expected to be zeros. Today this primarily validates “parameter passing + global memory + control flow can run end-to-end”.
 
 If the simulation finishes without errors, your PTX and asset configuration is correct.
-
----
-
-## 3.2 warp_reduce_add demo (split executable/PTX sources)
-
-For custom PTX opcodes (for example `warp_reduce_add`), use split sources:
-
-- Host executable source: `cuda/demo/warp_reduce_add_demo_executable.cu`
-- PTX override source: `cuda/demo/warp_reduce_add_demo_ptx.cu`
-
-Build host executable:
-
-```bash
-clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
-  --cuda-path=/usr/local/cuda \
-  --cuda-gpu-arch=sm_70 \
-  -L/usr/local/cuda/lib64 -lcudart \
-  -I/usr/local/cuda/include
-```
-
-Generate PTX override text:
-
-```bash
-clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
-  --cuda-path=/usr/local/cuda \
-  --cuda-gpu-arch=sm_70 \
-  --cuda-device-only \
-  --cuda-feature=+ptx64 \
-  -I/usr/local/cuda/include
-```
-
-Run through shim:
-
-```bash
-export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
-export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
-./cuda/demo/warp_reduce_add_demo_executable
-```
-
-Why split this way: a normal host CUDA build path invokes `ptxas`, which rejects unknown custom opcodes. Using a separate device-only PTX override keeps the host binary toolchain-compatible while still validating custom opcode execution in ProtoGPU.
 
 ---
 

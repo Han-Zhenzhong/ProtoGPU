@@ -1,15 +1,15 @@
 
-# demo.cu 编译与环境配置说明（Ubuntu 24.04）
+# CUDA demo 编译与环境配置说明（Ubuntu 24.04）
 
-本目录提供一个最小 CUDA C 示例（demo.cu），并详细说明：
+本目录提供多个 CUDA demo，包括 `demo.cu`、`streaming_demo.cu` 以及拆分的 `warp_reduce_add` demo 源文件，并详细说明：
 
 - 如何在 Ubuntu 24.04 下配置 clang 18.1.3 和 CUDA Toolkit 12.x 环境
-- 如何编译 demo.cu 生成可执行程序和 PTX 文件
+- 如何编译这些 CUDA demo 源码并生成可执行程序和 PTX 文件
 - 如何在 ProtoGPU 上运行 PTX 6.4/sm_70 并验证仿真
 - 常见问题与排查建议
 - 相关构建文档和官方参考资料链接
 
-适用于希望用 clang+CUDA 工具链配合 ProtoGPU 进行 PTX 仿真的开发者。
+适用于希望用 clang+CUDA 工具链配合 ProtoGPU，对本目录中的各个 demo 进行 PTX 仿真的开发者。
 
 ## 1. 环境准备
 
@@ -52,10 +52,11 @@ ls /usr/local/cuda/include/cuda_runtime.h
 ls /usr/local/cuda/lib64/libcudart.so
 ```
 
-## 2. 编译 demo.cu
+## 2. 编译这些 CUDA demo .cu 源文件
 
+### 2.1 编译 demo.cu
 
-### 2.1 生成可执行程序
+#### 2.1.1 生成可执行程序
 
 
 ```bash
@@ -72,7 +73,7 @@ clang++ demo.cu -o demo \
 
 
 
-### 2.2 生成 PTX 文件
+#### 2.1.2 生成 PTX 文件
 
 
 ```bash
@@ -102,14 +103,14 @@ head -n 20 demo.ptx
 
 ---
 
-## 2.3 编译 streaming_demo.cu（streams + memcpyAsync + kernel）
+### 2.2 编译 streaming_demo.cu（streams + memcpyAsync + kernel）
 
 本 repo 还提供一个更贴近“streaming”使用方式的 CUDA C demo：
 - `cuda/demo/streaming_demo.cu`
 
 它会创建两个 stream，并在各自 stream 上做：H2D -> kernel -> D2H，然后验证结果并输出 `OK`。
 
-### 2.3.1 编译可执行程序
+#### 2.2.1 编译可执行程序
 
 ```bash
 clang++ streaming_demo.cu -o streaming_demo \
@@ -119,7 +120,7 @@ clang++ streaming_demo.cu -o streaming_demo \
   -I/usr/local/cuda/include
 ```
 
-### 2.3.2 生成 PTX 文件（用于 shim 的 PTX override）
+#### 2.2.2 生成 PTX 文件（用于 shim 的 PTX override）
 
 ```bash
 clang++ streaming_demo.cu -S -o streaming_demo.ptx \
@@ -136,7 +137,7 @@ clang++ streaming_demo.cu -S -o streaming_demo.ptx \
 - 在 Linux/WSL 上，`GPUSIM_CUDART_SHIM_PTX_OVERRIDE` 可以是单个 PTX 路径，也可以是用 `:` 分隔的 PTX 路径列表。shim 会按顺序搜索这些 PTX，命中请求 `.entry` 的第一个 PTX 即为最终选择。
 - `-S` 用于强制输出**文本 PTX 汇编**；否则 clang 在某些版本/参数组合下可能把输出当作目标文件或其它中间产物，导致 `*.ptx` 不是可读的 PTX 文本。
 
-### 2.3.3 使用 CUDA Runtime shim 运行（Linux/WSL）
+#### 2.2.3 使用 CUDA Runtime shim 运行（Linux/WSL）
 
 在仓库根目录先构建 shim（得到 `build/libcudart.so.12`），然后把 shim 放到动态加载器优先路径，并设置 PTX override：
 
@@ -158,6 +159,46 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 ```
 
 如果显式设置了 override 环境变量，而列表中的任一 PTX 文件缺失、为空或不是合法 PTX 文本，shim 会立即失败，并且不会回退到 fatbin 提取。
+
+---
+
+### 2.3 编译 warp_reduce_add demo 源文件（可执行与 PTX 源分离）
+
+对于自定义 PTX 指令（例如 `warp_reduce_add`），建议使用“可执行源 + PTX 源分离”方式：
+
+- Host 可执行程序源码：`cuda/demo/warp_reduce_add_demo_executable.cu`
+- PTX override 源码：`cuda/demo/warp_reduce_add_demo_ptx.cu`
+
+编译 host 可执行程序：
+
+```bash
+clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  -L/usr/local/cuda/lib64 -lcudart \
+  -I/usr/local/cuda/include
+```
+
+生成 PTX override 文本：
+
+```bash
+clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
+  --cuda-path=/usr/local/cuda \
+  --cuda-gpu-arch=sm_70 \
+  --cuda-device-only \
+  --cuda-feature=+ptx64 \
+  -I/usr/local/cuda/include
+```
+
+通过 shim 运行：
+
+```bash
+export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
+export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
+./cuda/demo/warp_reduce_add_demo_executable
+```
+
+这样分离的原因：常规 host CUDA 编译路径会调用 `ptxas`，它无法接受未知自定义指令；把自定义指令放在独立的 device-only PTX override 中，可以同时保持 host 编译兼容性和 ProtoGPU 端到端验证能力。
 
 ---
 
@@ -207,46 +248,6 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 - 该 workload 里 A/B 初始是 zeros，因此 C 预期也是 zeros；当前主要用于验证“能跑通参数 + global memory + 控制流”。
 
 仿真输出如无报错，说明 PTX 及资产配置正确。
-
----
-
-## 3.2 warp_reduce_add demo（可执行与 PTX 源分离）
-
-对于自定义 PTX 指令（例如 `warp_reduce_add`），建议使用“可执行源 + PTX 源分离”方式：
-
-- Host 可执行程序源码：`cuda/demo/warp_reduce_add_demo_executable.cu`
-- PTX override 源码：`cuda/demo/warp_reduce_add_demo_ptx.cu`
-
-编译 host 可执行程序：
-
-```bash
-clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
-  --cuda-path=/usr/local/cuda \
-  --cuda-gpu-arch=sm_70 \
-  -L/usr/local/cuda/lib64 -lcudart \
-  -I/usr/local/cuda/include
-```
-
-生成 PTX override 文本：
-
-```bash
-clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
-  --cuda-path=/usr/local/cuda \
-  --cuda-gpu-arch=sm_70 \
-  --cuda-device-only \
-  --cuda-feature=+ptx64 \
-  -I/usr/local/cuda/include
-```
-
-通过 shim 运行：
-
-```bash
-export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
-export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
-./cuda/demo/warp_reduce_add_demo_executable
-```
-
-这样分离的原因：常规 host CUDA 编译路径会调用 `ptxas`，它无法接受未知自定义指令；把自定义指令放在独立的 device-only PTX override 中，可以同时保持 host 编译兼容性和 ProtoGPU 端到端验证能力。
 
 ---
 
