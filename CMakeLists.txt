@@ -69,7 +69,7 @@ add_custom_command(
   VERBATIM
 )
 
-add_library(gpu-sim-cudart-shim SHARED
+add_library(cudart-shim SHARED
   ${GPUSIM_CUDART_SHIM_EMBED_CPP}
   cuda/src/cudart_shim/exports.cpp
   cuda/src/cudart_shim/error_state.cpp
@@ -84,16 +84,16 @@ add_library(gpu-sim-cudart-shim SHARED
   cuda/src/cudart_shim/stream_scheduler.cpp
 )
 
-target_include_directories(gpu-sim-cudart-shim PRIVATE
+target_include_directories(cudart-shim PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
   ${GPUSIM_CUDART_SHIM_GEN_DIR}
 )
 
-target_link_libraries(gpu-sim-cudart-shim PRIVATE gpusim_core)
+target_link_libraries(cudart-shim PRIVATE gpusim_core)
 
 # Match the loader name expected by Linux demo binaries: libcudart.so.12
-set_target_properties(gpu-sim-cudart-shim PROPERTIES
+set_target_properties(cudart-shim PROPERTIES
   OUTPUT_NAME "cudart"
   SOVERSION 12
   VERSION 12.0
@@ -101,7 +101,7 @@ set_target_properties(gpu-sim-cudart-shim PROPERTIES
 
 # Provide ELF symbol versions expected by some clang/NVIDIA-linked demo binaries.
 if (UNIX AND NOT APPLE)
-  target_link_options(gpu-sim-cudart-shim PRIVATE
+  target_link_options(cudart-shim PRIVATE
     "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cuda/src/cudart_shim/libcudart.so.12.map"
   )
 endif()
@@ -114,37 +114,37 @@ if (BUILD_TESTING)
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
 
-  add_executable(gpu-sim-cudart-shim-smoke-tests
+  add_executable(cudart-shim-smoke-tests
     tests/cudart_shim_memory_smoke_tests.cpp
   )
-  target_include_directories(gpu-sim-cudart-shim-smoke-tests PRIVATE
+  target_include_directories(cudart-shim-smoke-tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
   )
-  target_link_libraries(gpu-sim-cudart-shim-smoke-tests PRIVATE gpu-sim-cudart-shim)
-  add_test(NAME gpu-sim-cudart-shim-smoke-tests COMMAND gpu-sim-cudart-shim-smoke-tests)
+  target_link_libraries(cudart-shim-smoke-tests PRIVATE cudart-shim)
+  add_test(NAME cudart-shim-smoke-tests COMMAND cudart-shim-smoke-tests)
 
-  add_executable(gpu-sim-cudart-shim-ptx-override-tests
+  add_executable(cudart-shim-ptx-override-tests
     cuda/src/cudart_shim/fatbin_registry.cpp
     cuda/src/cudart_shim/ptx_entry_validate.cpp
     tests/cudart_shim_ptx_override_tests.cpp
   )
-  target_include_directories(gpu-sim-cudart-shim-ptx-override-tests PRIVATE
+  target_include_directories(cudart-shim-ptx-override-tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
   )
-  add_test(NAME gpu-sim-cudart-shim-ptx-override-tests COMMAND gpu-sim-cudart-shim-ptx-override-tests)
+  add_test(NAME cudart-shim-ptx-override-tests COMMAND cudart-shim-ptx-override-tests)
 
   # Streaming shim test (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
-  add_executable(gpu-sim-cudart-shim-streaming-tests
+  add_executable(cudart-shim-streaming-tests
     tests/cudart_shim_streaming_tests.cpp
   )
-  target_link_libraries(gpu-sim-cudart-shim-streaming-tests PRIVATE gpu-sim-cudart-shim)
+  target_link_libraries(cudart-shim-streaming-tests PRIVATE cudart-shim)
   add_test(
-    NAME gpu-sim-cudart-shim-streaming-tests
+    NAME cudart-shim-streaming-tests
     COMMAND ${CMAKE_COMMAND} -E env
-            LD_LIBRARY_PATH=$<TARGET_FILE_DIR:gpu-sim-cudart-shim>
-            $<TARGET_FILE:gpu-sim-cudart-shim-streaming-tests>
+            LD_LIBRARY_PATH=$<TARGET_FILE_DIR:cudart-shim>
+            $<TARGET_FILE:cudart-shim-streaming-tests>
   )
-  set_tests_properties(gpu-sim-cudart-shim-streaming-tests PROPERTIES
+  set_tests_properties(cudart-shim-streaming-tests PROPERTIES
     PASS_REGULAR_EXPRESSION "OK"
   )
 
@@ -153,7 +153,7 @@ if (BUILD_TESTING)
   # This is Linux/WSL only.
   if (UNIX AND NOT APPLE)
     add_test(
-      NAME gpu-sim-cudart-shim-demo-integration
+      NAME cudart-shim-demo-integration
       COMMAND ${CMAKE_COMMAND} -E env
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
@@ -161,13 +161,13 @@ if (BUILD_TESTING)
                   bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_demo_integration.sh
                    ${CMAKE_BINARY_DIR}
     )
-    set_tests_properties(gpu-sim-cudart-shim-demo-integration PROPERTIES
+    set_tests_properties(cudart-shim-demo-integration PROPERTIES
       PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )
 
     add_test(
-      NAME gpu-sim-cudart-shim-multi-ptx-demo-integration
+      NAME cudart-shim-multi-ptx-demo-integration
       COMMAND ${CMAKE_COMMAND} -E env
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
@@ -175,13 +175,13 @@ if (BUILD_TESTING)
                   bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh
                    ${CMAKE_BINARY_DIR}
     )
-    set_tests_properties(gpu-sim-cudart-shim-multi-ptx-demo-integration PROPERTIES
+    set_tests_properties(cudart-shim-multi-ptx-demo-integration PROPERTIES
       PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )
 
     add_test(
-      NAME gpu-sim-cudart-shim-warp-reduce-add-demo-integration
+      NAME cudart-shim-warp-reduce-add-demo-integration
       COMMAND ${CMAKE_COMMAND} -E env
               GPUSIM_TEST_SKIP_RC=125
               GPUSIM_CUDART_SHIM_LOG=0
@@ -189,7 +189,21 @@ if (BUILD_TESTING)
                   bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_warp_reduce_add_demo_cu.sh
                    ${CMAKE_BINARY_DIR}
     )
-    set_tests_properties(gpu-sim-cudart-shim-warp-reduce-add-demo-integration PROPERTIES
+    set_tests_properties(cudart-shim-warp-reduce-add-demo-integration PROPERTIES
+      PASS_REGULAR_EXPRESSION "OK"
+      SKIP_RETURN_CODE 125
+    )
+
+    add_test(
+      NAME cudart-shim-streaming-demo-integration
+      COMMAND ${CMAKE_COMMAND} -E env
+              GPUSIM_TEST_SKIP_RC=125
+              GPUSIM_CUDART_SHIM_LOG=0
+              CONFIG=$<CONFIG>
+                  bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cuda_shim_e2e_streaming_demo_cu.sh
+                   ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(cudart-shim-streaming-demo-integration PROPERTIES
       PASS_REGULAR_EXPRESSION "OK"
       SKIP_RETURN_CODE 125
     )

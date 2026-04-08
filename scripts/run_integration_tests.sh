@@ -26,7 +26,13 @@ if [[ $need_build -eq 1 ]]; then
   BUILD_TESTING=ON bash "$SCRIPT_DIR/build_all.sh" "$BUILD_DIR" "$CONFIG"
 fi
 
+section() {
+  echo
+  echo "[integration] ==== $1 ===="
+}
+
 if command -v ctest >/dev/null 2>&1; then
+  section "GPU Sim Tier-0 Regression"
   echo "[integration] running tiny GPT-2 minimal coverage via ctest (build dir: $BUILD_DIR, config: $CONFIG)"
   ctest --test-dir "$BUILD_DIR" -C "$CONFIG" -V -R "^gpu-sim-tiny-gpt2-mincov-tests$"
 fi
@@ -55,6 +61,8 @@ OUT_DIR="$BUILD_DIR/test_out"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+section "CUDA Shim E2E Integration Tests"
+
 if [[ -f "$SCRIPT_DIR/run_cuda_shim_e2e_demo_integration.sh" ]]; then
   echo "[integration] running CUDA Runtime shim demo integration (if supported)"
   bash "$SCRIPT_DIR/run_cuda_shim_e2e_demo_integration.sh" "$BUILD_DIR"
@@ -82,6 +90,8 @@ INST_DESC="assets/inst_desc/demo_desc.json"
 CONFIG_JSON="assets/configs/demo_config.json"
 PAR_CONFIG_JSON="assets/configs/demo_parallel_config.json"
 MODSEL_CONFIG_JSON="assets/configs/demo_modular_selectors.json"
+
+section "GPU Sim CLI Integration Tests"
 
 echo "[integration] smoke run: demo_kernel.ptx"
 set +e
@@ -247,6 +257,8 @@ if ! grep -Fq "round_robin_interleave_step" "$OUT_DIR/trace_modsel.jsonl"; then
   exit 1
 fi
 
+section "GPU Sim Launch And IO Integration Tests"
+
 echo "[integration] 3D launch smoke: --grid 2,2,1 --block 40,1,1"
 set +e
 "$CLI" \
@@ -309,6 +321,8 @@ if ! grep -Fq "io-demo u32 result: 42" "$OUT_DIR/io_stdout.txt"; then
   tail -n 200 "$OUT_DIR/io_stdout.txt" >&2 || true
   exit 1
 fi
+
+section "GPU Sim Workload Integration Tests"
 
 echo "[integration] workload smoke: single stream (H2D -> KERNEL -> D2H -> sync)"
 set +e

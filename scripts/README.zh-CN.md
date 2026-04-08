@@ -20,6 +20,7 @@
 
 在 Linux/WSL 上，集成测试还会尝试跑一个 CUDA Runtime shim 的端到端 demo 回归（如果 `cuda/demo/demo` 可执行且 shim 已构建）：
 - `scripts/run_cuda_shim_e2e_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_streaming_demo_cu.sh`
 - `scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh`
 
 如果本机安装了 clang + CUDA Toolkit（能找到 `CUDA_PATH/include/cuda_runtime.h`），集成测试也会尝试：

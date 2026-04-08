@@ -37,7 +37,7 @@ Non-goals (MVP):
 
 ### Steps
 1) Add shim CMake target to root `CMakeLists.txt`:
-   - `add_library(gpu-sim-cudart-shim SHARED ...)`
+   - `add_library(cudart-shim SHARED ...)`
    - `target_link_libraries(... PRIVATE gpusim_core)`
    - Set output name/soname to satisfy `libcudart.so.12` lookup.
 2) Add `src/cudart_shim/exports.cpp` exporting:
@@ -240,7 +240,7 @@ Non-goals (MVP):
 
 ## Appendix A — Task checklist (for PR breakdown)
 
-- [x] CMake: `gpu-sim-cudart-shim` shared library target
+- [x] CMake: `cudart-shim` shared library target
 - [x] Minimal CUDA ABI types header
 - [x] ErrorState (last error + error string)
 - [x] AssetProvider (env + embedded)

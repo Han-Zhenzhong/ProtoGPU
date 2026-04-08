@@ -72,9 +72,9 @@ if [[ $need_build -eq 0 ]]; then
 fi
 
 if [[ $need_build -eq 1 ]]; then
-  echo "[cudart-shim-warp-reduce-add-cu] shim/assets out of date; building gpu-sim-cudart-shim"
+  echo "[cudart-shim-warp-reduce-add-cu] shim/assets out of date; building cudart-shim"
   if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
-    cmake --build "$BUILD_DIR" --config "$CONFIG" --target gpu-sim-cudart-shim
+    cmake --build "$BUILD_DIR" --config "$CONFIG" --target cudart-shim
   else
     BUILD_TESTING=ON bash "$SCRIPT_DIR/build_all.sh" "$BUILD_DIR" "$CONFIG"
   fi

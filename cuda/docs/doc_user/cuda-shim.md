@@ -155,7 +155,7 @@ On Linux/WSL, there is an end-to-end integration test that runs the prebuilt dem
 Via CTest:
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
+ctest --test-dir build -V -R "^cudart-shim-demo-integration$"
 ```
 
 Via repo script (also invoked by `scripts/run_integration_tests.sh`):
@@ -164,12 +164,26 @@ Via repo script (also invoked by `scripts/run_integration_tests.sh`):
 bash scripts/run_cuda_shim_e2e_demo_integration.sh build
 ```
 
+There is also an end-to-end streaming CUDA integration test that runs `cuda/demo/streaming_demo.cu` through the shim.
+
+Via CTest:
+
+```bash
+ctest --test-dir build -V -R "^cudart-shim-streaming-demo-integration$"
+```
+
+Via repo script:
+
+```bash
+bash scripts/run_cuda_shim_e2e_streaming_demo_cu.sh build
+```
+
 There is also an end-to-end multi-PTX integration test that verifies ordered PTX lookup across multiple override files and a malformed-list failure case.
 
 Via CTest:
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-multi-ptx-demo-integration$"
+ctest --test-dir build -V -R "^cudart-shim-multi-ptx-demo-integration$"
 ```
 
 Via repo script:

@@ -25,6 +25,7 @@ This directory provides two entry points:
 On Linux/WSL, integration tests will also try to run an end-to-end CUDA Runtime shim demo regression (if `cuda/demo/demo` exists and the shim has been built):
 
 - `scripts/run_cuda_shim_e2e_demo_integration.sh`
+- `scripts/run_cuda_shim_e2e_streaming_demo_cu.sh`
 - `scripts/run_cuda_shim_e2e_multi_ptx_demo_integration.sh`
 
 If clang + CUDA Toolkit are installed (i.e. `CUDA_PATH/include/cuda_runtime.h` is found), integration tests will also attempt to:

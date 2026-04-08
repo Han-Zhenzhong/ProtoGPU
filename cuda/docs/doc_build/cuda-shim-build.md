@@ -24,9 +24,9 @@ cmake --build build
 ```
 
 Artifacts:
-- Shim library target: `gpu-sim-cudart-shim`
+- Shim library target: `cudart-shim`
   - Produces `libcudart.so.12`-compatible SONAME (`libcudart.so.12` symlink behavior depends on platform/toolchain)
-- Smoke test: `gpu-sim-cudart-shim-smoke-tests`
+- Smoke test: `cudart-shim-smoke-tests`
 
 Notes:
 - The shim implementation lives under `cuda/src/cudart_shim/`.
@@ -56,7 +56,7 @@ If you change any of the 3 JSON files, rebuilding will regenerate the embedded a
 After building:
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-smoke-tests$"
+ctest --test-dir build -V -R "^cudart-shim-smoke-tests$"
 ```
 
 This validates:
@@ -72,7 +72,7 @@ This builds and runs a small C++ executable that links against the shim and exer
 - `cudaMemcpyAsync` on two streams (MVP semantics: synchronous execution, FIFO ordering)
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-streaming-tests$"
+ctest --test-dir build -V -R "^cudart-shim-streaming-tests$"
 ```
 
 ---
@@ -84,7 +84,7 @@ This runs the shim demo path against `cuda/demo/demo.cu`. When clang + CUDA Tool
 Via CTest:
 
 ```bash
-ctest --test-dir build -V -R "^gpu-sim-cudart-shim-demo-integration$"
+ctest --test-dir build -V -R "^cudart-shim-demo-integration$"
 ```
 
 Via repo script:
@@ -95,11 +95,29 @@ bash scripts/run_cuda_shim_e2e_demo_integration.sh build
 
 ---
 
+## 3.2) Run end-to-end streaming demo integration (Linux/WSL)
+
+This runs the shim against `cuda/demo/streaming_demo.cu`. When clang + CUDA Toolkit are available, the script compiles the host binary and generates text PTX on the fly; otherwise it falls back to the prebuilt `cuda/demo/streaming_demo` and `cuda/demo/streaming_demo.ptx` artifacts.
+
+Via CTest:
+
+```bash
+ctest --test-dir build -V -R "^cudart-shim-streaming-demo-integration$"
+```
+
+Via repo script:
+
+```bash
+bash scripts/run_cuda_shim_e2e_streaming_demo_cu.sh build
+```
+
+---
+
 ## 4) Troubleshooting build issues
 
 ### 4.1 Missing `libcudart.so.12` at runtime
 
-The shim target is named `gpu-sim-cudart-shim`, but the produced file name is controlled via:
+The shim target is named `cudart-shim`, but the produced file name is controlled via:
 - `OUTPUT_NAME cudart`
 - `SOVERSION 12`
 
@@ -115,7 +133,7 @@ Some toolchains may require GNU ld symbol version scripts.
 
 This repo currently enables symbol versioning for the shim on Linux/WSL:
 - Version script: `cuda/src/cudart_shim/libcudart.so.12.map`
-- Linker wiring: root `CMakeLists.txt` adds `-Wl,--version-script=...` to `gpu-sim-cudart-shim` when `UNIX AND NOT APPLE`.
+- Linker wiring: root `CMakeLists.txt` adds `-Wl,--version-script=...` to `cudart-shim` when `UNIX AND NOT APPLE`.
 
 If you want to verify the output contains versioned symbols:
 

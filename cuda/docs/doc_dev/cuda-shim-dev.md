@@ -57,8 +57,8 @@ Notes:
 
 Edit the root `CMakeLists.txt` to add something like:
 
-- `add_library(gpu-sim-cudart-shim SHARED ...)`
-- `target_link_libraries(gpu-sim-cudart-shim PRIVATE gpusim_core)`
+- `add_library(cudart-shim SHARED ...)`
+- `target_link_libraries(cudart-shim PRIVATE gpusim_core)`
 - `set_target_properties(... OUTPUT_NAME cudart SOVERSION 12 VERSION 12.0)`
 
 Key requirements:
@@ -375,7 +375,7 @@ Add new test executables under `tests/` for:
 ### 13.2 Integration: run the demo
 
 Linux MVP run procedure:
-1) Build `gpu-sim-cudart-shim`.
+1) Build `cudart-shim`.
 2) Ensure the loader uses it:
    - set `LD_LIBRARY_PATH` to include the build output directory, or
    - link demo with rpath pointing to it.
