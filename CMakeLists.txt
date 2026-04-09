@@ -108,14 +108,16 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
+  # GPU sim unit tests: core parser / ISA mapping / semantic execution coverage.
   add_executable(gpu-sim-tests
     tests/ptx_isa_mapper_tests.cpp
   )
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
 
+  # CUDA shim unit tests: host-side shim ABI / override / streaming API coverage.
   add_executable(cudart-shim-smoke-tests
-    tests/cudart_shim_memory_smoke_tests.cpp
+    tests/cuda/cudart_shim_memory_smoke_tests.cpp
   )
   target_include_directories(cudart-shim-smoke-tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
@@ -126,7 +128,7 @@ if (BUILD_TESTING)
   add_executable(cudart-shim-ptx-override-tests
     cuda/src/cudart_shim/fatbin_registry.cpp
     cuda/src/cudart_shim/ptx_entry_validate.cpp
-    tests/cudart_shim_ptx_override_tests.cpp
+    tests/cuda/cudart_shim_ptx_override_tests.cpp
   )
   target_include_directories(cudart-shim-ptx-override-tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/src
@@ -135,7 +137,7 @@ if (BUILD_TESTING)
 
   # Streaming shim test (no CUDA toolkit required): exercises cudaStream* + cudaMemcpyAsync.
   add_executable(cudart-shim-streaming-tests
-    tests/cudart_shim_streaming_tests.cpp
+    tests/cuda/cudart_shim_streaming_tests.cpp
   )
   target_link_libraries(cudart-shim-streaming-tests PRIVATE cudart-shim)
   add_test(
@@ -148,9 +150,9 @@ if (BUILD_TESTING)
     PASS_REGULAR_EXPRESSION "OK"
   )
 
-  # End-to-end shim integration: compile demo.cu when the CUDA toolchain is available,
-  # otherwise fall back to the prebuilt demo binary/PTX artifacts.
-  # This is Linux/WSL only.
+  # CUDA shim integration tests: end-to-end demo execution through the shim.
+  # Compile .cu sources when the CUDA toolchain is available; otherwise fall back
+  # to the prebuilt demo binary/PTX artifacts. Linux/WSL only.
   if (UNIX AND NOT APPLE)
     add_test(
       NAME cudart-shim-demo-integration
@@ -209,6 +211,8 @@ if (BUILD_TESTING)
     )
   endif()
 
+  # GPU sim unit tests: instruction descriptors, SIMT, memory, observability,
+  # public APIs, builtins, config parsing, and Tier-0 semantic regression.
   add_executable(gpu-sim-inst-desc-tests
     tests/inst_desc_registry_tests.cpp
   )
@@ -261,6 +265,7 @@ if (BUILD_TESTING)
             $<TARGET_FILE:gpu-sim-tiny-gpt2-mincov-tests>
   )
 
+  # GPU sim integration tests: CLI workload smoke coverage across launch/runtime IO paths.
   add_test(
     NAME gpu-sim-workload-smoke-single-stream
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}
