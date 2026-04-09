@@ -3,6 +3,7 @@
 测试代码根目录。
 
 目录约定
+- `cuda/`：CUDA Runtime shim / CUDA 相关测试
 - `unit/`：单模块单元测试
 - `integration/`：跨模块集成测试（runtime/engines/simt/units/memory/obs 的端到端流程）
 - `golden/`：golden traces 与期望结果

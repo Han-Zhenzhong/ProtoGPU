@@ -32,7 +32,7 @@ Design an additive extension to the existing GPUSIM_CUDART_SHIM_PTX_OVERRIDE flo
 - /home/hanzz/ProtoGPU/src/runtime/runtime.cpp — optional additive parity surface if multi-PTX helpers are introduced for public Runtime APIs.
 - /home/hanzz/ProtoGPU/include/gpusim/runtime.h — optional additive public declarations if Runtime gains helper overloads for multiple PTX inputs.
 - /home/hanzz/ProtoGPU/src/apps/cli/main.cpp — optional CLI parity surface only if the design chooses to expose multi-PTX input outside the shim.
-- /home/hanzz/ProtoGPU/tests/cudart_shim_memory_smoke_tests.cpp — existing shim smoke infrastructure; may stay unchanged but is a nearby place to assess coverage gaps.
+- /home/hanzz/ProtoGPU/tests/cuda/cudart_shim_memory_smoke_tests.cpp — existing shim smoke infrastructure; may stay unchanged but is a nearby place to assess coverage gaps.
 - /home/hanzz/ProtoGPU/tests/public_api_in_memory_tests.cpp — reference for lightweight public API tests if additive Runtime multi-text helpers are introduced.
 
 **Verification**
