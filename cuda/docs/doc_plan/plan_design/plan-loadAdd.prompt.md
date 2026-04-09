@@ -13,8 +13,8 @@ Add a custom PTX opcode load_add.global.u32 with semantics dst = dst + mem[addr]
 8. Update expansion in src/instruction/expander.cpp to materialize temp placeholders into MicroOp operands so runtime can carry value from LD output into ADD input while preserving original dst register source.
 9. Update runtime operand behavior in execution units only as needed for temp operand kind handling (likely contracts model extension in include/gpusim/contracts.h plus read/write handling paths in src/units/mem_unit.cpp and src/units/exec_core.cpp). Keep existing op enums unchanged.
 10. Phase 3: Frontend/runtime integration for new opcode
-11. Ensure parser/mapper accepts load_add.global.u32 syntax and maps to IR opcode load_add: add mapping-focused tests in tests/ptx_isa_mapper_tests.cpp for success and operand-form mismatch diagnostics.
-12. Ensure descriptor lookup and SIMT execution run load_add expansion correctly in single-lane and multi-lane contexts: add/extend SIMT or memory tests (tests/simt_predication_controlflow_tests.cpp and/or tests/memory_no_cache_addrspace_tests.cpp) to verify dst accumulation with initialized register + memory value and predication masking behavior.
+11. Ensure parser/mapper accepts load_add.global.u32 syntax and maps to IR opcode load_add: add mapping-focused tests in tests/unit/ptx_isa_mapper_tests.cpp for success and operand-form mismatch diagnostics.
+12. Ensure descriptor lookup and SIMT execution run load_add expansion correctly in single-lane and multi-lane contexts: add/extend SIMT or memory tests (tests/unit/simt_predication_controlflow_tests.cpp and/or tests/unit/memory_no_cache_addrspace_tests.cpp) to verify dst accumulation with initialized register + memory value and predication masking behavior.
 13. Verify observability naming remains coherent for emitted uops/events (UOP traces should show LD then ADD) and no control-flow regressions in SIMT loop at src/simt/simt.cpp.
 14. Phase 4: clang demo + integration automation
 15. Add new CUDA demo source in cuda/demo (for example load_add_demo.cu) using inline asm that emits load_add.global.u32 so generated PTX includes the custom opcode expected by simulator path.
@@ -36,10 +36,10 @@ Add a custom PTX opcode load_add.global.u32 with semantics dst = dst + mem[addr]
 - /home/hanzz/ProtoGPU/src/units/mem_unit.cpp — produce temp output for LD phase when descriptor targets temp.
 - /home/hanzz/ProtoGPU/src/units/exec_core.cpp — consume temp input during ADD phase.
 - /home/hanzz/ProtoGPU/src/instruction/ptx_isa.cpp — verify mapping path for new opcode and diagnostics.
-- /home/hanzz/ProtoGPU/tests/ptx_isa_mapper_tests.cpp — add mapper acceptance/negative tests for load_add.
-- /home/hanzz/ProtoGPU/tests/inst_desc_registry_tests.cpp — add parser/strict-key tests for new temp descriptor fields.
-- /home/hanzz/ProtoGPU/tests/memory_no_cache_addrspace_tests.cpp — add memory semantics tests for load_add behavior.
-- /home/hanzz/ProtoGPU/tests/simt_predication_controlflow_tests.cpp — optional predication/warp behavior regression guard.
+- /home/hanzz/ProtoGPU/tests/unit/ptx_isa_mapper_tests.cpp — add mapper acceptance/negative tests for load_add.
+- /home/hanzz/ProtoGPU/tests/unit/inst_desc_registry_tests.cpp — add parser/strict-key tests for new temp descriptor fields.
+- /home/hanzz/ProtoGPU/tests/unit/memory_no_cache_addrspace_tests.cpp — add memory semantics tests for load_add behavior.
+- /home/hanzz/ProtoGPU/tests/unit/simt_predication_controlflow_tests.cpp — optional predication/warp behavior regression guard.
 - /home/hanzz/ProtoGPU/cuda/demo/load_add_demo.cu — new .cu demo with inline asm load_add.
 - /home/hanzz/ProtoGPU/scripts/run_cuda_shim_load_add_demo_cu.sh — new end-to-end script for clang PTX generation + shim run.
 - /home/hanzz/ProtoGPU/CMakeLists.txt — add integration test registration.

@@ -201,17 +201,17 @@ Validate kernel outputs against CPU reference calculations.
 
 ## 11.1 Unit and semantic tests
 
-- `tests/inst_desc_registry_tests.cpp`
+- `tests/unit/inst_desc_registry_tests.cpp`
   - New uop token parses and resolves.
   - Descriptor lookup deterministic for new opcode.
 
-- `tests/builtins_tests.cpp`
+- `tests/unit/builtins_tests.cpp`
   - Full-mask broadcast writeback.
   - Partial-mask reduction.
   - In-place form (`dst == src`).
   - Empty mask no-op.
 
-- `tests/simt_predication_controlflow_tests.cpp`
+- `tests/unit/simt_predication_controlflow_tests.cpp`
   - Participation uses `warp.active & uop.guard`.
   - Non-participating lanes remain unchanged.
 

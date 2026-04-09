@@ -29,7 +29,7 @@
 
 ### 部分 warp（partial warp）
 - 支持 blockDim 不是 warp_size 整数倍的情况；通过 `active mask` 控制 lane 是否参与执行。
-- 回归证据：`tests/builtins_tests.cpp` 包含 partial warp 下 `%tid.x` 行为的验证用例。
+- 回归证据：`tests/unit/builtins_tests.cpp` 包含 partial warp 下 `%tid.x` 行为的验证用例。
 
 ---
 
@@ -47,7 +47,7 @@
 
 说明与验证：
 - 用户文档列出了该集合（见 `docs/doc_user/cli.md`）。
-- `tests/builtins_tests.cpp` 对 `tid.x` 给出可重复的语义验证（3D block inversion、partial warp）。
+- `tests/unit/builtins_tests.cpp` 对 `tid.x` 给出可重复的语义验证（3D block inversion、partial warp）。
 
 ---
 

@@ -30,9 +30,9 @@ Sync user/dev docs with finalized behavior, inline-asm workflow, deterministic p
 - [include/gpusim/contracts.h](include/gpusim/contracts.h) - MicroOpOp enum extension.
 - [src/instruction/descriptor_registry.cpp](src/instruction/descriptor_registry.cpp) - token parser and loader validation behavior.
 - [src/units/exec_core.cpp](src/units/exec_core.cpp) - warp_reduce_add execution logic.
-- [tests/inst_desc_registry_tests.cpp](tests/inst_desc_registry_tests.cpp) - descriptor/token coverage.
-- [tests/builtins_tests.cpp](tests/builtins_tests.cpp) - semantic correctness coverage.
-- [tests/simt_predication_controlflow_tests.cpp](tests/simt_predication_controlflow_tests.cpp) - active-mask/predication behavior.
+- [tests/unit/inst_desc_registry_tests.cpp](tests/unit/inst_desc_registry_tests.cpp) - descriptor/token coverage.
+- [tests/unit/builtins_tests.cpp](tests/unit/builtins_tests.cpp) - semantic correctness coverage.
+- [tests/unit/simt_predication_controlflow_tests.cpp](tests/unit/simt_predication_controlflow_tests.cpp) - active-mask/predication behavior.
 - [cuda/demo](cuda/demo) - inline-asm demo location.
 - [tests/integration](tests/integration) - shim end-to-end validation.
 

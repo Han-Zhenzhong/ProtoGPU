@@ -110,7 +110,7 @@ include(CTest)
 if (BUILD_TESTING)
   # GPU sim unit tests: core parser / ISA mapping / semantic execution coverage.
   add_executable(gpu-sim-tests
-    tests/ptx_isa_mapper_tests.cpp
+    tests/unit/ptx_isa_mapper_tests.cpp
   )
   target_link_libraries(gpu-sim-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-tests COMMAND gpu-sim-tests)
@@ -212,49 +212,50 @@ if (BUILD_TESTING)
   endif()
 
   # GPU sim unit tests: instruction descriptors, SIMT, memory, observability,
-  # public APIs, builtins, config parsing, and Tier-0 semantic regression.
+  # public APIs, builtins, and config parsing.
   add_executable(gpu-sim-inst-desc-tests
-    tests/inst_desc_registry_tests.cpp
+    tests/unit/inst_desc_registry_tests.cpp
   )
   target_link_libraries(gpu-sim-inst-desc-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-inst-desc-tests COMMAND gpu-sim-inst-desc-tests)
 
   add_executable(gpu-sim-simt-tests
-    tests/simt_predication_controlflow_tests.cpp
+    tests/unit/simt_predication_controlflow_tests.cpp
   )
   target_link_libraries(gpu-sim-simt-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-simt-tests COMMAND gpu-sim-simt-tests)
 
   add_executable(gpu-sim-memory-tests
-    tests/memory_no_cache_addrspace_tests.cpp
+    tests/unit/memory_no_cache_addrspace_tests.cpp
   )
   target_link_libraries(gpu-sim-memory-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-memory-tests COMMAND gpu-sim-memory-tests)
 
   add_executable(gpu-sim-observability-contract-tests
-    tests/observability_output_contract_tests.cpp
+    tests/unit/observability_output_contract_tests.cpp
   )
   target_link_libraries(gpu-sim-observability-contract-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-observability-contract-tests COMMAND gpu-sim-observability-contract-tests)
 
   add_executable(gpu-sim-public-api-tests
-    tests/public_api_in_memory_tests.cpp
+    tests/unit/public_api_in_memory_tests.cpp
   )
   target_link_libraries(gpu-sim-public-api-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-public-api-tests COMMAND gpu-sim-public-api-tests)
 
   add_executable(gpu-sim-builtins-tests
-    tests/builtins_tests.cpp
+    tests/unit/builtins_tests.cpp
   )
   target_link_libraries(gpu-sim-builtins-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-builtins-tests COMMAND gpu-sim-builtins-tests)
 
   add_executable(gpu-sim-config-parse-tests
-    tests/config_parse_tests.cpp
+    tests/unit/config_parse_tests.cpp
   )
   target_link_libraries(gpu-sim-config-parse-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-config-parse-tests COMMAND gpu-sim-config-parse-tests)
 
+  # GPU sim Tier-0 regression: end-to-end semantic bring-up coverage.
   add_executable(gpu-sim-tiny-gpt2-mincov-tests
     tests/tiny_gpt2_minimal_coverage_tests.cpp
   )

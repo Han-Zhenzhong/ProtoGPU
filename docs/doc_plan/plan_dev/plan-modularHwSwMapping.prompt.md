@@ -8,7 +8,7 @@
 3. 抽出 `ICtaScheduler` + factory：将 CTA 队列语义从 `src/simt/simt.cpp` 拆为可替换实现，默认 `fifo`，并由 Runtime/Engine 侧注入到 SIMT 执行入口。
 4. 引入 `IWarpScheduler` + baseline 实现：先提供“保持现状”的 `in_order_run_to_completion`，再加一个第二实现（可简化但必须可选），并把选择点从 `SimtExecutor` 内联逻辑替换为接口调用。
 5. 抽象 `IMemoryModel`（适配器优先）：在 `include/gpusim/memory.h` 定义接口，用适配器封装现有 `AddrSpaceManager`（实现仍在 `src/memory/memory.cpp`），并让 `MemUnit` 只依赖接口（见 `src/units/mem_unit.cpp`）。
-6. 让“组合可见且可验收”：在 `src/observability/observability.cpp` 增加一次性 `run_start/config_summary` 事件（包含 selectors 与 `sm_count/parallel/deterministic`），并补齐 unit+integration smoke（参照 `tests/config_parse_tests.cpp` 与 scripts 下并行 smoke）验证“配置确实生效”。
+6. 让“组合可见且可验收”：在 `src/observability/observability.cpp` 增加一次性 `run_start/config_summary` 事件（包含 selectors 与 `sm_count/parallel/deterministic`），并补齐 unit+integration smoke（参照 `tests/unit/config_parse_tests.cpp` 与 scripts 下并行 smoke）验证“配置确实生效”。
 
 ### Further Considerations
 1. WarpScheduler 第二实现范围：“真 RR 交错 step”。

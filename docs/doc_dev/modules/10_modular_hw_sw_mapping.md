@@ -188,7 +188,7 @@ arch.components: {
 
 建议将测试按“接口契约”组织：
 - Unit tests
-  - 配置解析与默认值：已由 `gpu-sim-config-parse-tests` 覆盖（见 `tests/config_parse_tests.cpp`）
+  - 配置解析与默认值：已由 `gpu-sim-config-parse-tests` 覆盖（见 `tests/unit/config_parse_tests.cpp`）
   -（后续）WarpScheduler 策略：给定阻塞/完成状态的 pick 结果
 - Integration smoke
   - 并行配置跑通并确认 trace 含 `"sm_id":`（见 scripts 集成测试的并行 smoke）

@@ -8,7 +8,7 @@
 3. 扩展 [include/gpusim/units.h](include/gpusim/units.h) 的 `WarpState`：`simt_stack` 与 `exited` 字段.
 4. 在 [src/simt/simt.cpp](src/simt/simt.cpp) 增加 stack normalize：空 mask pop、到达 `reconv_pc` merge.
 5. 在 [src/simt/simt.cpp](src/simt/simt.cpp) 对 `MicroOpOp::Bra` 实现 split/frames，必要时绕过 `ControlUnit::step`.
-6. 在 [src/simt/simt.cpp](src/simt/simt.cpp) 实现 lane-wise `MicroOpOp::Ret`，并更新/新增 [tests/simt_predication_controlflow_tests.cpp](tests/simt_predication_controlflow_tests.cpp).
+6. 在 [src/simt/simt.cpp](src/simt/simt.cpp) 实现 lane-wise `MicroOpOp::Ret`，并更新/新增 [tests/unit/simt_predication_controlflow_tests.cpp](tests/unit/simt_predication_controlflow_tests.cpp).
 
 ### Further Considerations 3
 1. Join 帧建模：显式 `Join` frame 可避免 `pc==reconv_pc` 死循环.

@@ -29,9 +29,9 @@ Add a new warp-level collective instruction `warp_reduce_add dst, src` with broa
 - `/home/hanzz/ProtoGPU/include/gpusim/contracts.h` - extend `MicroOpOp` enum (and related contract types if needed).
 - `/home/hanzz/ProtoGPU/src/instruction/descriptor_registry.cpp` - extend `parse_uop_op` mapping and preserve fail-fast behavior.
 - `/home/hanzz/ProtoGPU/src/units/exec_core.cpp` - implement warp-collective reduction execution path.
-- `/home/hanzz/ProtoGPU/tests/inst_desc_registry_tests.cpp` - validate descriptor parsing/lookup for the new op.
-- `/home/hanzz/ProtoGPU/tests/builtins_tests.cpp` - add semantic execution tests for writeback correctness.
-- `/home/hanzz/ProtoGPU/tests/simt_predication_controlflow_tests.cpp` - add active-mask/predication interaction coverage.
+- `/home/hanzz/ProtoGPU/tests/unit/inst_desc_registry_tests.cpp` - validate descriptor parsing/lookup for the new op.
+- `/home/hanzz/ProtoGPU/tests/unit/builtins_tests.cpp` - add semantic execution tests for writeback correctness.
+- `/home/hanzz/ProtoGPU/tests/unit/simt_predication_controlflow_tests.cpp` - add active-mask/predication interaction coverage.
 - `/home/hanzz/ProtoGPU/cuda/demo/` - add a minimal `.cu` demo that emits `warp_reduce_add` via inline PTX asm for fast bring-up.
 - `/home/hanzz/ProtoGPU/tests/integration/` - add/extend integration checks that run the new demo through the CUDA Runtime shim path.
 - `/home/hanzz/ProtoGPU/cuda/docs/doc_spec/inst_warp_reduce_add.md` - source specification; keep synchronized with implementation constraints and v1 type scope.
