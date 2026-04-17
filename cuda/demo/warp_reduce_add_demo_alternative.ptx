@@ -7,37 +7,17 @@
 .address_size 64
 
 	// .globl	_Z22warp_reduce_add_kernelPf // -- Begin function _Z22warp_reduce_add_kernelPf
-.weak .func  (.param .b32 func_retval0) _Z12__activemaskv
-()
-;
-.weak .func  (.param .b32 func_retval0) _Z16__shfl_down_syncjfji
-(
-	.param .b32 _Z16__shfl_down_syncjfji_param_0,
-	.param .b32 _Z16__shfl_down_syncjfji_param_1,
-	.param .b32 _Z16__shfl_down_syncjfji_param_2,
-	.param .b32 _Z16__shfl_down_syncjfji_param_3
-)
-;
-.weak .func  (.param .b32 func_retval0) _Z11__shfl_syncjfii
-(
-	.param .b32 _Z11__shfl_syncjfii_param_0,
-	.param .b32 _Z11__shfl_syncjfii_param_1,
-	.param .b32 _Z11__shfl_syncjfii_param_2,
-	.param .b32 _Z11__shfl_syncjfii_param_3
-)
-;
 .global .align 1 .b8 threadIdx[1];
                                         // @_Z22warp_reduce_add_kernelPf
 .visible .entry _Z22warp_reduce_add_kernelPf(
 	.param .u64 _Z22warp_reduce_add_kernelPf_param_0
 )
 {
-	.local .align 8 .b8 	__local_depot0[32];
+	.local .align 8 .b8 	__local_depot0[40];
 	.reg .b64 	%SP;
 	.reg .b64 	%SPL;
-	.reg .pred 	%p<2>;
-	.reg .b32 	%r<19>;
-	.reg .f32 	%f<12>;
+	.reg .b32 	%r<7>;
+	.reg .f32 	%f<8>;
 	.reg .b64 	%rd<8>;
 
 // %bb.0:
@@ -47,200 +27,43 @@
 	cvta.to.global.u64 	%rd2, %rd1;
 	cvta.global.u64 	%rd3, %rd2;
 	st.u64 	[%SP+0], %rd3;
-	mov.u32 	%r1, %tid.x;
-	st.u32 	[%SP+8], %r1;
-	ld.u32 	%r2, [%SP+8];
-	add.s32 	%r3, %r2, 1;
-	cvt.rn.f32.u32 	%f1, %r3;
-	st.f32 	[%SP+12], %f1;
-	mov.b32 	%r4, 0;
-	st.u32 	[%SP+16], %r4;
-	{ // callseq 0, 0
-	.reg .b32 temp_param_reg;
-	.param .b32 retval0;
-	call.uni (retval0), 
-	_Z12__activemaskv, 
-	(
-	);
-	ld.param.b32 	%r5, [retval0+0];
-	} // callseq 0
-	st.u32 	[%SP+20], %r5;
-	ld.f32 	%f2, [%SP+12];
-	st.f32 	[%SP+24], %f2;
-	mov.b32 	%r7, 4;
-	st.u32 	[%SP+28], %r7;
-	bra.uni 	$L__BB0_1;
-$L__BB0_1:                              // =>This Inner Loop Header: Depth=1
-	ld.u32 	%r8, [%SP+28];
-	setp.lt.s32 	%p1, %r8, 1;
-	@%p1 bra 	$L__BB0_4;
-	bra.uni 	$L__BB0_2;
-$L__BB0_2:                              //   in Loop: Header=BB0_1 Depth=1
-	ld.u32 	%r12, [%SP+20];
-	ld.f32 	%f7, [%SP+24];
-	ld.u32 	%r13, [%SP+28];
-	mov.b32 	%r14, 8;
-	{ // callseq 2, 0
-	.reg .b32 temp_param_reg;
-	.param .b32 param0;
-	st.param.b32 	[param0+0], %r12;
-	.param .b32 param1;
-	st.param.f32 	[param1+0], %f7;
-	.param .b32 param2;
-	st.param.b32 	[param2+0], %r13;
-	.param .b32 param3;
-	st.param.b32 	[param3+0], %r14;
-	.param .b32 retval0;
-	call.uni (retval0), 
-	_Z16__shfl_down_syncjfji, 
-	(
-	param0, 
-	param1, 
-	param2, 
-	param3
-	);
-	ld.param.f32 	%f8, [retval0+0];
-	} // callseq 2
-	ld.f32 	%f10, [%SP+24];
-	add.rn.f32 	%f11, %f10, %f8;
-	st.f32 	[%SP+24], %f11;
-	bra.uni 	$L__BB0_3;
-$L__BB0_3:                              //   in Loop: Header=BB0_1 Depth=1
-	ld.u32 	%r15, [%SP+28];
-	shr.u32 	%r16, %r15, 31;
-	add.s32 	%r17, %r15, %r16;
-	shr.s32 	%r18, %r17, 1;
-	st.u32 	[%SP+28], %r18;
-	bra.uni 	$L__BB0_1;
-$L__BB0_4:
-	ld.u32 	%r9, [%SP+20];
-	ld.f32 	%f3, [%SP+24];
-	mov.b32 	%r10, 0;
-	mov.b32 	%r11, 8;
-	{ // callseq 1, 0
-	.reg .b32 temp_param_reg;
-	.param .b32 param0;
-	st.param.b32 	[param0+0], %r9;
-	.param .b32 param1;
-	st.param.f32 	[param1+0], %f3;
-	.param .b32 param2;
-	st.param.b32 	[param2+0], %r10;
-	.param .b32 param3;
-	st.param.b32 	[param3+0], %r11;
-	.param .b32 retval0;
-	call.uni (retval0), 
-	_Z11__shfl_syncjfii, 
-	(
-	param0, 
-	param1, 
-	param2, 
-	param3
-	);
-	ld.param.f32 	%f4, [retval0+0];
-	} // callseq 1
-	st.f32 	[%SP+16], %f4;
-	ld.f32 	%f6, [%SP+16];
+	mov.u32 	%r4, %tid.x;
+	st.u32 	[%SP+8], %r4;
+	ld.u32 	%r5, [%SP+8];
+	add.s32 	%r6, %r5, 1;
+	cvt.rn.f32.u32 	%f5, %r6;
+	st.f32 	[%SP+12], %f5;
+	mov.b32 	%r3, 0;
+	st.u32 	[%SP+16], %r3;
+	mov.b32 	%r2, -1;
+	st.u32 	[%SP+20], %r2;
+	mov.b32 	%r1, 6175;
+	st.u32 	[%SP+24], %r1;
+	ld.f32 	%f6, [%SP+12];
+	st.f32 	[%SP+28], %f6;
+	st.u32 	[%SP+32], %r3;
+	st.u32 	[%SP+36], %r3;
+	ld.f32 	%f4, [%SP+28];
+	mov.f32 	%f2, %f4;
+	// begin inline asm
+	shfl.sync.down.b32 %f1, %f2, 4, %r1, %r2;
+	add.rn.f32 %f2, %f2, %f1;
+	shfl.sync.down.b32 %f1, %f2, 2, %r1, %r2;
+	add.rn.f32 %f2, %f2, %f1;
+	shfl.sync.down.b32 %f1, %f2, 1, %r1, %r2;
+	add.rn.f32 %f2, %f2, %f1;
+	shfl.sync.idx.b32 %f3, %f2, %r3, %r1, %r2;
+
+	// end inline asm
+	st.f32 	[%SP+32], %f1;
+	st.f32 	[%SP+28], %f2;
+	st.f32 	[%SP+16], %f3;
+	ld.f32 	%f7, [%SP+16];
 	ld.u64 	%rd4, [%SP+0];
 	ld.u32 	%rd5, [%SP+8];
 	shl.b64 	%rd6, %rd5, 2;
 	add.s64 	%rd7, %rd4, %rd6;
-	st.f32 	[%rd7], %f6;
-	ret;
-                                        // -- End function
-}
-	// .weak	_Z12__activemaskv               // -- Begin function _Z12__activemaskv
-.weak .func  (.param .b32 func_retval0) _Z12__activemaskv() // @_Z12__activemaskv
-{
-	.local .align 4 .b8 	__local_depot1[4];
-	.reg .b64 	%SP;
-	.reg .b64 	%SPL;
-	.reg .b32 	%r<3>;
-
-// %bb.0:
-	mov.u64 	%SPL, __local_depot1;
-	cvta.local.u64 	%SP, %SPL;
-	// begin inline asm
-	activemask.b32 %r1;
-	// end inline asm
-	st.u32 	[%SP+0], %r1;
-	ld.u32 	%r2, [%SP+0];
-	st.param.b32 	[func_retval0+0], %r2;
-	ret;
-                                        // -- End function
-}
-	// .weak	_Z16__shfl_down_syncjfji        // -- Begin function _Z16__shfl_down_syncjfji
-.weak .func  (.param .b32 func_retval0) _Z16__shfl_down_syncjfji(
-	.param .b32 _Z16__shfl_down_syncjfji_param_0,
-	.param .b32 _Z16__shfl_down_syncjfji_param_1,
-	.param .b32 _Z16__shfl_down_syncjfji_param_2,
-	.param .b32 _Z16__shfl_down_syncjfji_param_3
-)                                       // @_Z16__shfl_down_syncjfji
-{
-	.local .align 4 .b8 	__local_depot2[16];
-	.reg .b64 	%SP;
-	.reg .b64 	%SPL;
-	.reg .b32 	%r<11>;
-	.reg .f32 	%f<4>;
-
-// %bb.0:
-	mov.u64 	%SPL, __local_depot2;
-	cvta.local.u64 	%SP, %SPL;
-	ld.param.u32 	%r3, [_Z16__shfl_down_syncjfji_param_3];
-	ld.param.u32 	%r2, [_Z16__shfl_down_syncjfji_param_2];
-	ld.param.f32 	%f1, [_Z16__shfl_down_syncjfji_param_1];
-	ld.param.u32 	%r1, [_Z16__shfl_down_syncjfji_param_0];
-	st.u32 	[%SP+0], %r1;
-	st.f32 	[%SP+4], %f1;
-	st.u32 	[%SP+8], %r2;
-	st.u32 	[%SP+12], %r3;
-	ld.u32 	%r4, [%SP+0];
-	ld.f32 	%f2, [%SP+4];
-	ld.u32 	%r5, [%SP+8];
-	ld.u32 	%r6, [%SP+12];
-	mov.b32 	%r7, 32;
-	sub.s32 	%r8, %r7, %r6;
-	shl.b32 	%r9, %r8, 8;
-	or.b32  	%r10, %r9, 31;
-	shfl.sync.down.b32	%f3, %f2, %r5, %r10, %r4;
-	st.param.f32 	[func_retval0+0], %f3;
-	ret;
-                                        // -- End function
-}
-	// .weak	_Z11__shfl_syncjfii             // -- Begin function _Z11__shfl_syncjfii
-.weak .func  (.param .b32 func_retval0) _Z11__shfl_syncjfii(
-	.param .b32 _Z11__shfl_syncjfii_param_0,
-	.param .b32 _Z11__shfl_syncjfii_param_1,
-	.param .b32 _Z11__shfl_syncjfii_param_2,
-	.param .b32 _Z11__shfl_syncjfii_param_3
-)                                       // @_Z11__shfl_syncjfii
-{
-	.local .align 4 .b8 	__local_depot3[16];
-	.reg .b64 	%SP;
-	.reg .b64 	%SPL;
-	.reg .b32 	%r<11>;
-	.reg .f32 	%f<4>;
-
-// %bb.0:
-	mov.u64 	%SPL, __local_depot3;
-	cvta.local.u64 	%SP, %SPL;
-	ld.param.u32 	%r3, [_Z11__shfl_syncjfii_param_3];
-	ld.param.u32 	%r2, [_Z11__shfl_syncjfii_param_2];
-	ld.param.f32 	%f1, [_Z11__shfl_syncjfii_param_1];
-	ld.param.u32 	%r1, [_Z11__shfl_syncjfii_param_0];
-	st.u32 	[%SP+0], %r1;
-	st.f32 	[%SP+4], %f1;
-	st.u32 	[%SP+8], %r2;
-	st.u32 	[%SP+12], %r3;
-	ld.u32 	%r4, [%SP+0];
-	ld.f32 	%f2, [%SP+4];
-	ld.u32 	%r5, [%SP+8];
-	ld.u32 	%r6, [%SP+12];
-	mov.b32 	%r7, 32;
-	sub.s32 	%r8, %r7, %r6;
-	shl.b32 	%r9, %r8, 8;
-	or.b32  	%r10, %r9, 31;
-	shfl.sync.idx.b32	%f3, %f2, %r5, %r10, %r4;
-	st.param.f32 	[func_retval0+0], %f3;
+	st.f32 	[%rd7], %f7;
 	ret;
                                         // -- End function
 }
