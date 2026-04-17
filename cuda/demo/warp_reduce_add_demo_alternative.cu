@@ -24,14 +24,24 @@ __global__ void warp_reduce_add_kernel(float* out) {
   float y = 0.0f;
 
   // ProtoGPU executes warp_reduce_add through pre-generated PTX instead of fatbin.
-  // Alternative: use CUDA's __shfl_down_sync for warp reduction as a fallback.
-  const unsigned mask = __activemask();
+  // Alternative: use inline PTX shuffle ops to avoid call instructions in generated PTX.
+  // For this fixed 8-thread demo, a full mask is valid.
+  const unsigned mask = 0xFFFFFFFFu;
+  constexpr unsigned kShuffleClamp8 = ((32u - 8u) << 8) | 31u;
   float sum = x;
-  for (int offset = 4; offset > 0; offset /= 2) {
-    sum += __shfl_down_sync(mask, sum, offset, 8);
-  }
-  // Broadcast lane-0 reduction result so all lanes match warp_reduce_add semantics.
-  y = __shfl_sync(mask, sum, 0, 8);
+  float tmp = 0.0f;
+  // Inline the full 8-lane tree reduction and lane-0 broadcast in PTX.
+  const int src_lane = 0;
+  asm volatile(
+      "shfl.sync.down.b32 %0, %1, 4, %3, %4;\n\t"
+      "add.rn.f32 %1, %1, %0;\n\t"
+      "shfl.sync.down.b32 %0, %1, 2, %3, %4;\n\t"
+      "add.rn.f32 %1, %1, %0;\n\t"
+      "shfl.sync.down.b32 %0, %1, 1, %3, %4;\n\t"
+      "add.rn.f32 %1, %1, %0;\n\t"
+      "shfl.sync.idx.b32 %2, %1, %5, %3, %4;\n"
+      : "=&f"(tmp), "+f"(sum), "=f"(y)
+      : "r"(kShuffleClamp8), "r"(mask), "r"(src_lane));
 
   out[tid] = y;
 }

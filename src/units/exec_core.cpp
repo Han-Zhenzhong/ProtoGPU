@@ -150,6 +150,13 @@ static bool has_flag(const std::vector<std::string>& flags, const char* name) {
   return false;
 }
 
+static std::uint32_t shfl_width_from_clamp(std::uint32_t clamp) {
+  // CUDA PTX shfl wrappers encode width as: c = ((32 - width) << 8) | 31.
+  const std::uint32_t width = 32u - ((clamp >> 8) & 0x1Fu);
+  if (width == 0u || width > 32u) return 32u;
+  return width;
+}
+
 } // namespace
 
 StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) {
@@ -219,6 +226,27 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
       r.blocked_reason = BlockedReason::Error;
       return r;
     }
+
+    if (uop.attrs.type == ValueType::F32) {
+      for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+        if (!lane_mask_test(exec_mask, lane)) continue;
+        auto a_bits = read_operand_lane(uop.inputs[0], warp, lane);
+        auto b_bits = read_operand_lane(uop.inputs[1], warp, lane);
+        if (!a_bits.has_value() || !b_bits.has_value()) {
+          r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+          r.blocked_reason = BlockedReason::Error;
+          return r;
+        }
+        const float a = f32_from_bits(static_cast<std::uint32_t>(*a_bits));
+        const float b = f32_from_bits(static_cast<std::uint32_t>(*b_bits));
+        const float out = a + b;
+        write_reg_lane(uop.outputs[0], warp, lane, static_cast<std::uint64_t>(f32_to_bits(out)));
+      }
+      obs.counter("uop.exec.add.f32");
+      r.progressed = true;
+      return r;
+    }
+
     for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
       if (!lane_mask_test(exec_mask, lane)) continue;
       auto a = read_operand_lane(uop.inputs[0], warp, lane);
@@ -325,6 +353,74 @@ StepResult ExecCore::step(const MicroOp& uop, WarpState& warp, ObsControl& obs) 
     }
 
     obs.counter("uop.exec.shl");
+    r.progressed = true;
+    return r;
+  }
+  case MicroOpOp::Shfl: {
+    if (uop.outputs.size() != 1 || uop.inputs.size() != 4) {
+      r.diag = Diagnostic{ "units.exec", "E_UOP_ARITY", "SHFL expects 4 in, 1 out", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    const bool do_down = has_flag(uop.attrs.flags, "down");
+    const bool do_idx = has_flag(uop.attrs.flags, "idx");
+    if (static_cast<int>(do_down) + static_cast<int>(do_idx) != 1) {
+      r.diag = Diagnostic{ "units.exec", "E_SHFL_MODE", "SHFL requires exactly one of .down or .idx", std::nullopt, std::nullopt, std::nullopt };
+      r.blocked_reason = BlockedReason::Error;
+      return r;
+    }
+
+    for (std::uint32_t lane = 0; lane < exec_mask.width && lane < 32; lane++) {
+      if (!lane_mask_test(exec_mask, lane)) continue;
+
+      auto src_self = read_operand_lane(uop.inputs[0], warp, lane);
+      auto lane_param = read_operand_lane(uop.inputs[1], warp, lane);
+      auto clamp_param = read_operand_lane(uop.inputs[2], warp, lane);
+      auto member_param = read_operand_lane(uop.inputs[3], warp, lane);
+      if (!src_self.has_value() || !lane_param.has_value() || !clamp_param.has_value() || !member_param.has_value()) {
+        r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+        r.blocked_reason = BlockedReason::Error;
+        return r;
+      }
+
+      const auto lane_u32 = static_cast<std::uint32_t>(lane);
+      const auto lane_or_idx = static_cast<std::uint32_t>(*lane_param);
+      const auto clamp = static_cast<std::uint32_t>(*clamp_param);
+      const auto member_mask = static_cast<std::uint32_t>(*member_param);
+
+      const auto width = shfl_width_from_clamp(clamp);
+      const auto seg_base = lane_u32 - (lane_u32 % width);
+
+      std::uint32_t src_lane = lane_u32;
+      if (do_down) {
+        const auto delta = lane_or_idx & 0x1Fu;
+        const auto lane_in_seg = lane_u32 - seg_base;
+        if (lane_in_seg + delta < width) {
+          src_lane = lane_u32 + delta;
+        }
+      } else {
+        src_lane = seg_base + ((lane_or_idx & 0x1Fu) % width);
+      }
+
+      std::uint64_t out_bits = *src_self;
+      const bool lane_in_member = ((member_mask >> lane_u32) & 1u) != 0u;
+      const bool src_in_range = src_lane < exec_mask.width && src_lane < 32u;
+      const bool src_in_member = src_in_range && (((member_mask >> src_lane) & 1u) != 0u);
+      if (lane_in_member && src_in_member) {
+        auto src_bits = read_operand_lane(uop.inputs[0], warp, src_lane);
+        if (!src_bits.has_value()) {
+          r.diag = Diagnostic{ "units.exec", "E_SPECIAL_UNKNOWN", "unknown special operand", std::nullopt, std::nullopt, std::nullopt };
+          r.blocked_reason = BlockedReason::Error;
+          return r;
+        }
+        out_bits = *src_bits;
+      }
+
+      write_reg_lane(uop.outputs[0], warp, lane, out_bits);
+    }
+
+    obs.counter(do_down ? "uop.exec.shfl.down" : "uop.exec.shfl.idx");
     r.progressed = true;
     return r;
   }

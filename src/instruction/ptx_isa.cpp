@@ -11,6 +11,8 @@ namespace gpusim {
 
 namespace {
 
+constexpr std::int64_t kF32RegIdBias = 4096;
+
 std::string to_lower(std::string s) {
   for (auto& ch : s) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
   return s;
@@ -101,7 +103,7 @@ std::optional<Operand> parse_operand_by_kind(const std::string& kind,
       }
       o.kind = OperandKind::Reg;
       o.type = ValueType::F32;
-      o.reg_id = id;
+      o.reg_id = kF32RegIdBias + id;
     } else if (tok.rfind("%r", 0) == 0) {
       std::int64_t id = -1;
       if (!parse_u64_dec(tok.substr(2), id)) {

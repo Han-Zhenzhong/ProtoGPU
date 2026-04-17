@@ -14,6 +14,7 @@ static MicroOpOp parse_uop_op(const std::string& s) {
   if (s == "ADD") return MicroOpOp::Add;
   if (s == "MUL") return MicroOpOp::Mul;
   if (s == "SHL") return MicroOpOp::Shl;
+  if (s == "SHFL") return MicroOpOp::Shfl;
   if (s == "FMA") return MicroOpOp::Fma;
   if (s == "WARP_REDUCE_ADD") return MicroOpOp::WarpReduceAdd;
   if (s == "SETP") return MicroOpOp::Setp;

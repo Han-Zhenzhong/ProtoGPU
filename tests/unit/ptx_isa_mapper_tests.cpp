@@ -254,6 +254,59 @@ int main() {
     }
   }
 
+  {
+    const std::string isa_json = R"JSON(
+    {
+      "insts": [
+        { "ptx_opcode": "setp", "type_mod": "s32", "operand_kinds": ["pred", "reg", "imm"], "ir_op": "setp" }
+      ]
+    }
+    )JSON";
+
+    TokenizedPtxInst inst;
+    inst.ptx_opcode = "setp";
+    inst.mods.type_mod = "s32";
+    inst.operand_tokens = {"%p1", "%r8", "1"};
+
+    InstRecord ir;
+    auto diag = map_one(isa_json, inst, ir);
+    EXPECT_TRUE(!diag.has_value());
+    EXPECT_EQ(ir.opcode, std::string("setp"));
+    EXPECT_EQ(ir.operands.size(), static_cast<std::size_t>(3));
+    EXPECT_EQ(ir.operands[0].kind, OperandKind::Pred);
+    EXPECT_EQ(ir.operands[1].kind, OperandKind::Reg);
+    EXPECT_EQ(ir.operands[2].kind, OperandKind::Imm);
+    EXPECT_EQ(ir.operands[2].imm_i64, 1);
+  }
+
+  {
+    const std::string isa_json = R"JSON(
+    {
+      "insts": [
+        { "ptx_opcode": "shfl", "type_mod": "b32", "operand_kinds": ["reg", "reg", "reg", "reg", "reg"], "ir_op": "shfl" }
+      ]
+    }
+    )JSON";
+
+    TokenizedPtxInst inst;
+    inst.ptx_opcode = "shfl";
+    inst.mods.type_mod = "b32";
+    inst.mods.flags = {"sync", "down"};
+    inst.operand_tokens = {"%f3", "%f2", "%r5", "%r10", "%r4"};
+
+    InstRecord ir;
+    auto diag = map_one(isa_json, inst, ir);
+    EXPECT_TRUE(!diag.has_value());
+    EXPECT_EQ(ir.opcode, std::string("shfl"));
+    EXPECT_EQ(ir.operands.size(), static_cast<std::size_t>(5));
+    EXPECT_EQ(ir.operands[0].kind, OperandKind::Reg);
+    EXPECT_EQ(ir.operands[0].type, ValueType::F32);
+    EXPECT_EQ(ir.operands[1].kind, OperandKind::Reg);
+    EXPECT_EQ(ir.operands[1].type, ValueType::F32);
+    EXPECT_EQ(ir.operands[2].kind, OperandKind::Reg);
+    EXPECT_EQ(ir.operands[2].type, ValueType::U32);
+  }
+
   if (g_failures) {
     std::cerr << "FAILURES: " << g_failures << "\n";
     return 1;

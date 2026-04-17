@@ -116,6 +116,85 @@ static gpusim::MicroOp make_cvt_uop(std::int64_t dst_reg,
   return u;
 }
 
+static gpusim::MicroOp make_add_uop(std::int64_t dst_reg,
+                                    std::int64_t lhs_reg,
+                                    std::int64_t rhs_reg,
+                                    gpusim::ValueType type,
+                                    std::uint32_t warp_size,
+                                    std::uint32_t guard_bits) {
+  using namespace gpusim;
+
+  Operand lhs;
+  lhs.kind = OperandKind::Reg;
+  lhs.type = type;
+  lhs.reg_id = lhs_reg;
+
+  Operand rhs;
+  rhs.kind = OperandKind::Reg;
+  rhs.type = type;
+  rhs.reg_id = rhs_reg;
+
+  Operand out;
+  out.kind = OperandKind::Reg;
+  out.type = type;
+  out.reg_id = dst_reg;
+
+  MicroOp u;
+  u.kind = MicroOpKind::Exec;
+  u.op = MicroOpOp::Add;
+  u.attrs.type = type;
+  u.inputs = {lhs, rhs};
+  u.outputs = {out};
+  u.guard.width = warp_size;
+  u.guard.bits_lo = guard_bits;
+  return u;
+}
+
+static gpusim::MicroOp make_shfl_uop(std::int64_t dst_reg,
+                                     std::int64_t src_reg,
+                                     std::int64_t lane_or_idx_reg,
+                                     std::int64_t clamp_reg,
+                                     std::int64_t mask_reg,
+                                     std::uint32_t warp_size,
+                                     const std::string& mode_flag) {
+  using namespace gpusim;
+
+  Operand out;
+  out.kind = OperandKind::Reg;
+  out.type = ValueType::F32;
+  out.reg_id = dst_reg;
+
+  Operand in_src;
+  in_src.kind = OperandKind::Reg;
+  in_src.type = ValueType::F32;
+  in_src.reg_id = src_reg;
+
+  Operand in_lane;
+  in_lane.kind = OperandKind::Reg;
+  in_lane.type = ValueType::U32;
+  in_lane.reg_id = lane_or_idx_reg;
+
+  Operand in_clamp;
+  in_clamp.kind = OperandKind::Reg;
+  in_clamp.type = ValueType::U32;
+  in_clamp.reg_id = clamp_reg;
+
+  Operand in_mask;
+  in_mask.kind = OperandKind::Reg;
+  in_mask.type = ValueType::U32;
+  in_mask.reg_id = mask_reg;
+
+  MicroOp u;
+  u.kind = MicroOpKind::Exec;
+  u.op = MicroOpOp::Shfl;
+  u.attrs.type = ValueType::U32;
+  u.attrs.flags = {"sync", mode_flag};
+  u.inputs = {in_src, in_lane, in_clamp, in_mask};
+  u.outputs = {out};
+  u.guard = lane_mask_all(warp_size);
+  return u;
+}
+
 } // namespace
 
 int main() {
@@ -268,6 +347,42 @@ int main() {
     EXPECT_TRUE(sr.diag.has_value());
     if (sr.diag) {
       EXPECT_EQ(sr.diag->code, std::string("E_UOP_TYPE"));
+    }
+  }
+
+  {
+    // ADD f32 performs floating-point addition (not integer bit arithmetic).
+    const std::uint32_t warp_size = 4;
+
+    WarpState warp;
+    warp.launch.grid_dim = Dim3{ 1, 1, 1 };
+    warp.launch.block_dim = Dim3{ warp_size, 1, 1 };
+    warp.launch.warp_size = warp_size;
+    warp.ctaid = Dim3{ 0, 0, 0 };
+    warp.warpid = 0;
+    warp.lane_base_thread_linear = 0;
+    warp.pc = 0;
+    warp.done = false;
+    warp.active.width = warp_size;
+    warp.active.bits_lo = 0xFu;
+
+    warp.r_u32.assign(static_cast<std::size_t>(3) * warp_size, 0u);
+    warp.r_u64.clear();
+    warp.p.assign(static_cast<std::size_t>(8) * warp_size, 1);
+
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      warp.r_u32[reg_lane_index(1, lane, warp_size)] = f32_to_bits(static_cast<float>(lane + 1));
+      warp.r_u32[reg_lane_index(2, lane, warp_size)] = f32_to_bits(10.0f + static_cast<float>(lane));
+    }
+
+    ObsControl obs(ObsConfig{ false, 16 });
+    ExecCore exec;
+    auto uop = make_add_uop(/*dst=*/0, /*lhs=*/1, /*rhs=*/2, ValueType::F32, warp_size, 0xFu);
+
+    auto sr = exec.step(uop, warp, obs);
+    EXPECT_TRUE(!sr.diag.has_value());
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      EXPECT_EQ(warp.r_u32[reg_lane_index(0, lane, warp_size)], f32_to_bits(static_cast<float>(11u + 2u * lane)));
     }
   }
 
@@ -458,6 +573,89 @@ int main() {
     EXPECT_TRUE(sr.diag.has_value());
     if (sr.diag) {
       EXPECT_EQ(sr.diag->code, std::string("E_UOP_TYPE"));
+    }
+  }
+
+  {
+    // SHFL down across width=8 segment: lane i gets value from i+1, lane7 keeps its own value.
+    const std::uint32_t warp_size = 8;
+
+    WarpState warp;
+    warp.launch.grid_dim = Dim3{ 1, 1, 1 };
+    warp.launch.block_dim = Dim3{ warp_size, 1, 1 };
+    warp.launch.warp_size = warp_size;
+    warp.ctaid = Dim3{ 0, 0, 0 };
+    warp.warpid = 0;
+    warp.lane_base_thread_linear = 0;
+    warp.pc = 0;
+    warp.done = false;
+    warp.active.width = warp_size;
+    warp.active.bits_lo = 0xFFu;
+
+    warp.r_u32.assign(static_cast<std::size_t>(5) * warp_size, 0u);
+    warp.r_u64.clear();
+    warp.p.assign(static_cast<std::size_t>(8) * warp_size, 1);
+
+    const std::uint32_t kClamp8 = ((32u - 8u) << 8) | 31u;
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      warp.r_u32[reg_lane_index(1, lane, warp_size)] = f32_to_bits(static_cast<float>(lane + 1));
+      warp.r_u32[reg_lane_index(2, lane, warp_size)] = 1u;
+      warp.r_u32[reg_lane_index(3, lane, warp_size)] = kClamp8;
+      warp.r_u32[reg_lane_index(4, lane, warp_size)] = 0xFFFFFFFFu;
+    }
+
+    ObsControl obs(ObsConfig{ false, 16 });
+    ExecCore exec;
+    auto uop = make_shfl_uop(/*dst=*/0, /*src=*/1, /*lane=*/2, /*clamp=*/3, /*mask=*/4, warp_size, "down");
+
+    auto sr = exec.step(uop, warp, obs);
+    EXPECT_TRUE(!sr.diag.has_value());
+
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      const auto idx = reg_lane_index(0, lane, warp_size);
+      const float expected = (lane + 1u < warp_size) ? static_cast<float>(lane + 2u) : static_cast<float>(lane + 1u);
+      EXPECT_EQ(warp.r_u32[idx], f32_to_bits(expected));
+    }
+  }
+
+  {
+    // SHFL idx across width=8 segment: all lanes read from source lane 0.
+    const std::uint32_t warp_size = 8;
+
+    WarpState warp;
+    warp.launch.grid_dim = Dim3{ 1, 1, 1 };
+    warp.launch.block_dim = Dim3{ warp_size, 1, 1 };
+    warp.launch.warp_size = warp_size;
+    warp.ctaid = Dim3{ 0, 0, 0 };
+    warp.warpid = 0;
+    warp.lane_base_thread_linear = 0;
+    warp.pc = 0;
+    warp.done = false;
+    warp.active.width = warp_size;
+    warp.active.bits_lo = 0xFFu;
+
+    warp.r_u32.assign(static_cast<std::size_t>(5) * warp_size, 0u);
+    warp.r_u64.clear();
+    warp.p.assign(static_cast<std::size_t>(8) * warp_size, 1);
+
+    const std::uint32_t kClamp8 = ((32u - 8u) << 8) | 31u;
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      warp.r_u32[reg_lane_index(1, lane, warp_size)] = f32_to_bits(static_cast<float>(100u + lane));
+      warp.r_u32[reg_lane_index(2, lane, warp_size)] = 0u;
+      warp.r_u32[reg_lane_index(3, lane, warp_size)] = kClamp8;
+      warp.r_u32[reg_lane_index(4, lane, warp_size)] = 0xFFFFFFFFu;
+    }
+
+    ObsControl obs(ObsConfig{ false, 16 });
+    ExecCore exec;
+    auto uop = make_shfl_uop(/*dst=*/0, /*src=*/1, /*lane=*/2, /*clamp=*/3, /*mask=*/4, warp_size, "idx");
+
+    auto sr = exec.step(uop, warp, obs);
+    EXPECT_TRUE(!sr.diag.has_value());
+
+    for (std::uint32_t lane = 0; lane < warp_size; lane++) {
+      const auto idx = reg_lane_index(0, lane, warp_size);
+      EXPECT_EQ(warp.r_u32[idx], f32_to_bits(100.0f));
     }
   }
 

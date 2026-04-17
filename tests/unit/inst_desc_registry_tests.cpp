@@ -239,6 +239,67 @@ void test_cvt_uop_parses_and_looks_up() {
   }
 }
 
+void test_shfl_uop_parses_and_looks_up() {
+  using namespace gpusim;
+
+  const std::string json = R"JSON(
+  {
+    "insts": [
+      {
+        "opcode": "shfl",
+        "type_mod": "b32",
+        "operand_kinds": ["reg", "reg", "reg", "reg", "reg"],
+        "uops": [
+          { "kind": "EXEC", "op": "SHFL", "in": [1, 2, 3, 4], "out": [0] }
+        ]
+      }
+    ]
+  }
+  )JSON";
+
+  DescriptorRegistry reg;
+  reg.load_json_text(json);
+
+  InstRecord inst;
+  inst.opcode = "shfl";
+  inst.mods.type_mod = "b32";
+  inst.mods.flags = {"sync", "down"};
+
+  Operand dst;
+  dst.kind = OperandKind::Reg;
+  dst.type = ValueType::F32;
+  dst.reg_id = 0;
+
+  Operand src;
+  src.kind = OperandKind::Reg;
+  src.type = ValueType::F32;
+  src.reg_id = 1;
+
+  Operand lane_or_idx;
+  lane_or_idx.kind = OperandKind::Reg;
+  lane_or_idx.type = ValueType::U32;
+  lane_or_idx.reg_id = 2;
+
+  Operand clamp;
+  clamp.kind = OperandKind::Reg;
+  clamp.type = ValueType::U32;
+  clamp.reg_id = 3;
+
+  Operand member;
+  member.kind = OperandKind::Reg;
+  member.type = ValueType::U32;
+  member.reg_id = 4;
+
+  inst.operands = {dst, src, lane_or_idx, clamp, member};
+
+  const auto desc = reg.lookup(inst);
+  EXPECT_TRUE(desc.has_value());
+  if (desc) {
+    EXPECT_TRUE(!desc->uops.empty());
+    EXPECT_TRUE(desc->uops[0].op == MicroOpOp::Shfl);
+  }
+}
+
 } // namespace
 
 int main() {
@@ -248,6 +309,7 @@ int main() {
   test_unknown_uop_has_context_in_message();
   test_warp_reduce_add_uop_parses_and_looks_up();
   test_cvt_uop_parses_and_looks_up();
+  test_shfl_uop_parses_and_looks_up();
 
   if (g_failures) {
     std::cerr << "FAILURES: " << g_failures << "\n";

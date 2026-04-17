@@ -65,6 +65,22 @@
       ]
     },
     {
+      "opcode": "mov",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "mov",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "MOV", "in": [1], "out": [0] }
+      ]
+    },
+    {
       "opcode": "cvt",
       "type_mod": "u32",
       "operand_kinds": ["reg", "reg"],
@@ -131,6 +147,22 @@
     {
       "opcode": "add",
       "type_mod": "s64",
+      "operand_kinds": ["reg", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
+      "type_mod": "f32",
+      "operand_kinds": ["reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "add",
+      "type_mod": "f32",
       "operand_kinds": ["reg", "reg", "imm"],
       "uops": [
         { "kind": "EXEC", "op": "ADD", "in": [1, 2], "out": [0] }
@@ -274,10 +306,58 @@
     },
     {
       "opcode": "setp",
+      "type_mod": "s32",
+      "operand_kinds": ["pred", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "SETP", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "setp",
       "type_mod": "u32",
       "operand_kinds": ["pred", "reg", "reg"],
       "uops": [
         { "kind": "EXEC", "op": "SETP", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "setp",
+      "type_mod": "u32",
+      "operand_kinds": ["pred", "reg", "imm"],
+      "uops": [
+        { "kind": "EXEC", "op": "SETP", "in": [1, 2], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "shfl",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg", "reg", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "SHFL", "in": [1, 2, 3, 4], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "shfl",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg", "imm", "reg", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "SHFL", "in": [1, 2, 3, 4], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "shfl",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg", "reg", "imm", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "SHFL", "in": [1, 2, 3, 4], "out": [0] }
+      ]
+    },
+    {
+      "opcode": "shfl",
+      "type_mod": "b32",
+      "operand_kinds": ["reg", "reg", "imm", "imm", "reg"],
+      "uops": [
+        { "kind": "EXEC", "op": "SHFL", "in": [1, 2, 3, 4], "out": [0] }
       ]
     },
     {
