@@ -34,6 +34,8 @@ bool RuntimeContext::ensure_initialized(std::string& out_error) {
   try {
     auto cfg = gpusim::load_app_config_json_text(assets.config_json);
     warp_size_ = cfg.sim.warp_size;
+    profile_ = cfg.sim.profile;
+    deterministic_ = cfg.sim.deterministic;
 
     // Fail-fast: validate the remaining assets are parseable before we report init success.
     // This matches the requirement that env overrides must error immediately if invalid.

@@ -94,6 +94,8 @@ Example:
 export GPUSIM_CONFIG=$PWD/assets/configs/demo_config.json
 export GPUSIM_PTX_ISA=$PWD/assets/ptx_isa/demo_ptx64.json
 export GPUSIM_INST_DESC=$PWD/assets/inst_desc/demo_desc.json
+export GPUSIM_TRACE=$PWD/out/shim.trace.jsonl
+export GPUSIM_STATS=$PWD/out/shim.stats.json
 ```
 
 Fail-fast behavior:
@@ -117,6 +119,27 @@ export GPUSIM_CUDART_SHIM_LOG=1
 ```
 
 This prints basic shim events to stderr.
+
+### 4.2.1 Export trace and stats
+
+Optional env vars:
+
+- `GPUSIM_TRACE=<path>`: write the current runtime trace snapshot as JSONL when `cudaDeviceSynchronize()` or `cudaStreamSynchronize()` completes.
+- `GPUSIM_STATS=<path>`: write the current runtime counters snapshot as JSON when `cudaDeviceSynchronize()` or `cudaStreamSynchronize()` completes.
+
+Behavior notes:
+
+- files are overwritten on each synchronize call with the latest cumulative snapshot for the process
+- directories are created automatically if needed
+- if neither env var is set, the shim behaves exactly as before
+
+Example:
+
+```bash
+export GPUSIM_TRACE=$PWD/out/shim.trace.jsonl
+export GPUSIM_STATS=$PWD/out/shim.stats.json
+./cuda/demo/demo
+```
 
 ### 4.3 Debug fatbin / PTX extraction
 

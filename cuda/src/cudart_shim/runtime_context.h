@@ -25,6 +25,8 @@ public:
   const AssetsText& assets() const { return assets_; }
 
   std::uint32_t warp_size() const { return warp_size_; }
+  const std::string& profile() const { return profile_; }
+  bool deterministic() const { return deterministic_; }
 
   std::mutex& global_mutex() { return mu_; }
 
@@ -38,6 +40,8 @@ private:
   AssetsText assets_;
   std::optional<gpusim::Runtime> rt_;
   std::uint32_t warp_size_ = 32;
+  std::string profile_;
+  bool deterministic_ = false;
 };
 
 } // namespace gpusim_cudart_shim

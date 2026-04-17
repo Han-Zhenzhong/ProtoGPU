@@ -13,11 +13,14 @@
 #include "cudart_shim/stream_scheduler.h"
 
 #include "gpusim/frontend.h"
+#include "gpusim/observability.h"
 
 
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <new>
 #include <string>
@@ -97,6 +100,63 @@ static bool ensure_init_or_fail(std::string& out_err) {
   return RuntimeContext::instance().ensure_initialized(out_err);
 }
 
+static cudaError_t dump_observability(RuntimeContext& ctx) {
+  const char* trace_path = std::getenv("GPUSIM_TRACE");
+  const char* stats_path = std::getenv("GPUSIM_STATS");
+
+  if ((!trace_path || *trace_path == '\0') && (!stats_path || *stats_path == '\0')) {
+    return cudaSuccess;
+  }
+
+  try {
+    auto& rt = ctx.runtime();
+
+    if (trace_path && *trace_path != '\0') {
+      std::filesystem::path out_path(trace_path);
+      if (out_path.has_parent_path()) {
+        std::filesystem::create_directories(out_path.parent_path());
+      }
+
+      std::ofstream trace(out_path, std::ios::binary | std::ios::trunc);
+      if (!trace) {
+        return fail(cudaErrorUnknown, std::string("trace export failed: cannot open ") + trace_path);
+      }
+
+      gpusim::TraceHeader header;
+      header.profile = ctx.profile();
+      header.deterministic = ctx.deterministic();
+      trace << gpusim::trace_header_to_json_line(header);
+
+      for (const auto& e : rt.obs().trace_snapshot()) {
+        trace << gpusim::event_to_json_line(e);
+      }
+    }
+
+    if (stats_path && *stats_path != '\0') {
+      std::filesystem::path out_path(stats_path);
+      if (out_path.has_parent_path()) {
+        std::filesystem::create_directories(out_path.parent_path());
+      }
+
+      std::ofstream stats(out_path, std::ios::binary | std::ios::trunc);
+      if (!stats) {
+        return fail(cudaErrorUnknown, std::string("stats export failed: cannot open ") + stats_path);
+      }
+
+      gpusim::StatsMeta meta;
+      meta.profile = ctx.profile();
+      meta.deterministic = ctx.deterministic();
+      stats << gpusim::stats_to_json(rt.obs().counters_snapshot(), meta);
+    }
+  } catch (const std::exception& ex) {
+    return fail(cudaErrorUnknown, std::string("observability export failed: ") + ex.what());
+  } catch (...) {
+    return fail(cudaErrorUnknown, "observability export failed: unknown exception");
+  }
+
+  return cudaSuccess;
+}
+
 } // namespace gpusim_cudart_shim
 
 // --- Exported CUDA Runtime API (subset) ---
@@ -130,6 +190,14 @@ GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaDeviceSynchronize() {
   }
   // MVP: execute synchronously, but keep the API for correctness.
   gpusim_cudart_shim::stream_scheduler_singleton().drain_all();
+  {
+    auto& ctx = gpusim_cudart_shim::RuntimeContext::instance();
+    std::scoped_lock lk(ctx.global_mutex());
+    auto rc = gpusim_cudart_shim::dump_observability(ctx);
+    if (rc != gpusim_cudart_shim::cudaSuccess) {
+      return rc;
+    }
+  }
   gpusim_cudart_shim::ErrorState::tls().set(gpusim_cudart_shim::cudaSuccess);
   return gpusim_cudart_shim::cudaSuccess;
 }
@@ -257,6 +325,14 @@ GPUSIM_CUDART_EXPORT gpusim_cudart_shim::cudaError_t cudaStreamSynchronize(gpusi
     return fail(cudaErrorInitializationError, init_err);
   }
   stream_scheduler_singleton().drain_all();
+  {
+    auto& ctx = RuntimeContext::instance();
+    std::scoped_lock lk(ctx.global_mutex());
+    auto rc = dump_observability(ctx);
+    if (rc != cudaSuccess) {
+      return rc;
+    }
+  }
   ErrorState::tls().set(cudaSuccess);
   return cudaSuccess;
 }
