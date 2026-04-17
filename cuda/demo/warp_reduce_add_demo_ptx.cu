@@ -1,3 +1,18 @@
+// Use this file to generate PTX including warp_reduce_add from warp_reduce_add_demo_ptx.cu with
+// clang++ and cuda toolkit 12.1, specifying PTX6.4 and SM70.
+//
+// warp_reduce_add is a custom PTX instruction implemented in the ProtoGPU CUDA Runtime shim,
+// which performs a warp-wide reduction by addition. Each thread in the warp provides an input value,
+// and the instruction computes the sum of these values across the active threads in the warp,
+// returning the result to each thread.
+//
+// warp_reduce_add is not a standard CUDA intrinsic and is not recognized by the NVIDIA CUDA compiler (nvcc).
+// Instead, it is a custom instruction that must be implemented in the ProtoGPU CUDA Runtime shim.
+// To use this instruction, you need to generate PTX code that includes it, which can be done using
+// clang++ with the appropriate flags to target the desired PTX version and architecture.
+//
+// warp_reduce_add is generated into PTX file according asm volatile.
+
 #include <cuda_runtime.h>
 
 #include <cstdint>
