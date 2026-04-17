@@ -24,8 +24,14 @@ __global__ void warp_reduce_add_kernel(float* out) {
   float y = 0.0f;
 
   // ProtoGPU executes warp_reduce_add through pre-generated PTX instead of fatbin.
-  // Generate PTX including warp_reduce_add from warp_reduce_add_demo_ptx.cu with clang++ and cuda toolkit 12.1, specifying PTX6.4 and SM70.
-  // asm volatile("warp_reduce_add.f32 %0, %1;" : "=f"(y) : "f"(x));
+  // Alternative: use CUDA's __shfl_down_sync for warp reduction as a fallback.
+  const unsigned mask = __activemask();
+  float sum = x;
+  for (int offset = 4; offset > 0; offset /= 2) {
+    sum += __shfl_down_sync(mask, sum, offset, 8);
+  }
+  // Broadcast lane-0 reduction result so all lanes match warp_reduce_add semantics.
+  y = __shfl_sync(mask, sum, 0, 8);
 
   out[tid] = y;
 }

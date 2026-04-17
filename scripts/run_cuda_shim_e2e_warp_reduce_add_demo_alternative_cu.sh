@@ -26,9 +26,9 @@ if gpusim_cuda_toolchain_available; then
 fi
 
 EXE_SRC="$REPO_ROOT/cuda/demo/warp_reduce_add_demo_alternative.cu"
-PTX_SRC="$REPO_ROOT/cuda/demo/warp_reduce_add_demo_ptx.cu"
+PTX_SRC="$REPO_ROOT/cuda/demo/warp_reduce_add_demo_alternative.cu"
 PREBUILT_BIN="$REPO_ROOT/cuda/demo/warp_reduce_add_demo"
-PREBUILT_PTX="$REPO_ROOT/cuda/demo/warp_reduce_add_demo.ptx"
+PREBUILT_PTX="$REPO_ROOT/cuda/demo/warp_reduce_add_demo_alternative.ptx"
 if [[ ! -f "$EXE_SRC" ]]; then
   echo "[cudart-shim-warp-reduce-add-cu] skip: missing $EXE_SRC"
   exit "$SKIP_RC"
@@ -97,7 +97,7 @@ OUT_DIR="$BUILD_DIR/test_out"
 mkdir -p "$OUT_DIR"
 
 BIN="$OUT_DIR/warp_reduce_add_demo"
-PTX="$OUT_DIR/warp_reduce_add_demo.ptx"
+PTX="$OUT_DIR/warp_reduce_add_demo_alternative.ptx"
 BIN_TO_RUN="$BIN"
 PTX_TO_USE="$PTX"
 STDOUT="$OUT_DIR/cudart_warp_reduce_add_cu_stdout.txt"

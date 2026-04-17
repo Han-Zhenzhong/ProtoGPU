@@ -164,13 +164,13 @@ If the override env var is explicitly set and any listed PTX file is missing, em
 
 For custom PTX opcodes (for example `warp_reduce_add`), use split sources:
 
-- Host executable source: `cuda/demo/warp_reduce_add_demo_executable.cu`
+- Host executable source: `cuda/demo/warp_reduce_add_demo_alternative.cu`
 - PTX override source: `cuda/demo/warp_reduce_add_demo_ptx.cu`
 
 Build host executable:
 
 ```bash
-clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+clang++ warp_reduce_add_demo_alternative.cu -o warp_reduce_add_demo \
   --cuda-path=/usr/local/cuda \
   --cuda-gpu-arch=sm_70 \
   -L/usr/local/cuda/lib64 -lcudart \
@@ -193,7 +193,7 @@ Run through shim:
 ```bash
 export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
 export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
-./cuda/demo/warp_reduce_add_demo_executable
+./cuda/demo/warp_reduce_add_demo
 ```
 
 Why split this way: a normal host CUDA build path invokes `ptxas`, which rejects unknown custom opcodes. Using a separate device-only PTX override keeps the host binary toolchain-compatible while still validating custom opcode execution in ProtoGPU.

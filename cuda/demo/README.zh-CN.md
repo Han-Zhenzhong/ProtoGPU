@@ -166,13 +166,13 @@ export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/streaming_demo_a.ptx:$PWD
 
 对于自定义 PTX 指令（例如 `warp_reduce_add`），建议使用“可执行源 + PTX 源分离”方式：
 
-- Host 可执行程序源码：`cuda/demo/warp_reduce_add_demo_executable.cu`
+- Host 可执行程序源码：`cuda/demo/warp_reduce_add_demo_alternative.cu`
 - PTX override 源码：`cuda/demo/warp_reduce_add_demo_ptx.cu`
 
 编译 host 可执行程序：
 
 ```bash
-clang++ warp_reduce_add_demo_executable.cu -o warp_reduce_add_demo_executable \
+clang++ warp_reduce_add_demo_alternative.cu -o warp_reduce_add_demo \
   --cuda-path=/usr/local/cuda \
   --cuda-gpu-arch=sm_70 \
   -L/usr/local/cuda/lib64 -lcudart \
@@ -195,7 +195,7 @@ clang++ warp_reduce_add_demo_ptx.cu -S -o warp_reduce_add_demo.ptx \
 ```bash
 export LD_LIBRARY_PATH="$PWD/build:${LD_LIBRARY_PATH}"
 export GPUSIM_CUDART_SHIM_PTX_OVERRIDE="$PWD/cuda/demo/warp_reduce_add_demo.ptx"
-./cuda/demo/warp_reduce_add_demo_executable
+./cuda/demo/warp_reduce_add_demo
 ```
 
 这样分离的原因：常规 host CUDA 编译路径会调用 `ptxas`，它无法接受未知自定义指令；把自定义指令放在独立的 device-only PTX override 中，可以同时保持 host 编译兼容性和 ProtoGPU 端到端验证能力。
