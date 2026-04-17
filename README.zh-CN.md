@@ -91,3 +91,7 @@
 
 - scripts/
   - 本地辅助脚本入口（build/run/test/format 等）。
+
+## License
+
+本项目采用 Apache License 2.0 开源协议。详见根目录下的 [LICENSE](LICENSE) 文件。
