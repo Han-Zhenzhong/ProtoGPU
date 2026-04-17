@@ -51,3 +51,7 @@ This directory contains all documentation for `ProtoGPU`.
 
 - Docs cross-link using relative paths, and links should work even when opened from the repo root.
 - If text conflicts with PUML diagrams, diagrams win (see each doc_* README for details).
+
+## License
+
+Unless otherwise noted, content in this directory is licensed under CC BY 4.0. See [LICENSE](LICENSE).

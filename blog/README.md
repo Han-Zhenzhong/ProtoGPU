@@ -1,3 +1,7 @@
 # Blog
 
 - 2026-02-09: [ProtoGPU：可配置指令集、micro-op 组合执行、可组合硬件架构的 PTX/SIMT 虚拟机](2026-02-09-gpu-sim-configurable-isa-modular-uop.md)
+
+## License
+
+Unless otherwise noted, content in this directory is licensed under CC BY 4.0. See [LICENSE](LICENSE).

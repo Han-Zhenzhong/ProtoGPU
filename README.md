@@ -345,4 +345,6 @@ Contributions are welcome!
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+Source code and other non-documentation repository contents are licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+Documentation content under `blog/`, `docs/`, and `cuda/docs/` is separately licensed under CC BY 4.0. See [blog/LICENSE](blog/LICENSE), [docs/LICENSE](docs/LICENSE), and [cuda/docs/LICENSE](cuda/docs/LICENSE).

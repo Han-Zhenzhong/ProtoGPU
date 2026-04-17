@@ -94,4 +94,6 @@
 
 ## License
 
-本项目采用 Apache License 2.0 开源协议。详见根目录下的 [LICENSE](LICENSE) 文件。
+源码及其他非文档仓库内容采用 Apache License 2.0 开源协议。详见根目录下的 [LICENSE](LICENSE) 文件。
+
+`blog/`、`docs/` 和 `cuda/docs/` 下的文档内容单独采用 CC BY 4.0 许可。详见 [blog/LICENSE](blog/LICENSE)、[docs/LICENSE](docs/LICENSE) 和 [cuda/docs/LICENSE](cuda/docs/LICENSE)。

@@ -11,3 +11,7 @@
 Build & usage:
 - Build: `cuda/docs/doc_build/cuda-shim-build.md`
 - User guide: `cuda/docs/doc_user/cuda-shim.md`
+
+## License
+
+Unless otherwise noted, content in this directory is licensed under CC BY 4.0. See [LICENSE](LICENSE).
