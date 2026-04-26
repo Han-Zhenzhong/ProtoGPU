@@ -3,8 +3,11 @@ set -e
 
 echo "[pre-commit] Running checks..."
 
-# 只检查 staged 的文件
-CPP_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cc|cpp|cxx|h|hpp)$' || true)
+# 只检查 staged 的文件（忽略 virtual_hw 下内容）
+CPP_FILES=$(git diff --cached --name-only --diff-filter=ACM \
+  | grep -E '\.(c|cc|cpp|cxx|h|hpp)$' \
+  | grep -Ev '^virtual_hw/' \
+  || true)
 
 if [ -z "$CPP_FILES" ]; then
   echo "[pre-commit] No C/C++ files to check."
