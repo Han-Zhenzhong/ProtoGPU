@@ -1,0 +1,1 @@
+savedcmd_protogpu_drv.ko := ld -r -m elf_x86_64 --fatal-warnings -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T /home/hanzz/kernel-dev/linux/scripts/module.lds -o protogpu_drv.ko protogpu_drv.o protogpu_drv.mod.o .module-common.o

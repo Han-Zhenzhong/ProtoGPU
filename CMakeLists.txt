@@ -41,11 +41,60 @@ target_compile_definitions(gpusim_core PRIVATE
   GPUSIM_VERSION="0.1"
 )
 
+add_library(protogpu_vhw_broker
+  virtual_hw/broker/blocking_executor.cpp
+  virtual_hw/broker/socket_transport.cpp
+)
+
+target_include_directories(protogpu_vhw_broker PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/driver
+)
+
+target_link_libraries(protogpu_vhw_broker PUBLIC gpusim_core)
+
 add_executable(gpu-sim-cli
   src/apps/cli/main.cpp
 )
 
 target_link_libraries(gpu-sim-cli PRIVATE gpusim_core)
+
+add_executable(protogpu-vhw-demo
+  virtual_hw/demo/direct_submit_demo.cpp
+)
+
+target_link_libraries(protogpu-vhw-demo PRIVATE protogpu_vhw_broker)
+
+add_executable(protogpu-vhw-brokerd
+  virtual_hw/broker/daemon_main.cpp
+)
+
+target_link_libraries(protogpu-vhw-brokerd PRIVATE protogpu_vhw_broker)
+
+add_executable(protogpu-vhw-remote-demo
+  virtual_hw/demo/remote_submit_demo.cpp
+)
+
+target_link_libraries(protogpu-vhw-remote-demo PRIVATE protogpu_vhw_broker)
+
+add_executable(protogpu-vhw-ioctl-sample
+  virtual_hw/demo/device_node_ioctl_sample.cpp
+)
+
+target_include_directories(protogpu-vhw-ioctl-sample PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/driver
+)
+
+add_executable(protogpu-vhw-device-node-tests
+  tests/virtual_hw/device_node_ioctl_tests.cpp
+)
+
+target_include_directories(protogpu-vhw-device-node-tests PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/virtual_hw/driver
+)
 
 # --- CUDA Runtime Shim (MVP) ---
 # A minimal libcudart replacement that routes selected CUDA Runtime APIs to gpu-sim.
@@ -254,6 +303,14 @@ if (BUILD_TESTING)
   )
   target_link_libraries(gpu-sim-config-parse-tests PRIVATE gpusim_core)
   add_test(NAME gpu-sim-config-parse-tests COMMAND gpu-sim-config-parse-tests)
+
+  add_executable(protogpu-vhw-broker-tests
+    tests/virtual_hw/blocking_broker_tests.cpp
+  )
+  target_link_libraries(protogpu-vhw-broker-tests PRIVATE protogpu_vhw_broker)
+  add_test(NAME protogpu-vhw-broker-tests COMMAND protogpu-vhw-broker-tests)
+
+  add_test(NAME protogpu-vhw-device-node-tests COMMAND protogpu-vhw-device-node-tests)
 
   # GPU sim Tier-0 regression: end-to-end semantic bring-up coverage.
   add_executable(gpu-sim-tiny-gpt2-mincov-tests
